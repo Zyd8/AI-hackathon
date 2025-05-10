@@ -122,3 +122,46 @@
 .add-buttons button:hover {
   background-color: #16a34a;
 }
+
+/* Rooms section */
+.rooms {
+  margin-top: 40px;
+}
+
+.rooms-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.room-controls input,
+.room-controls select {
+  padding: 8px;
+  margin-left: 10px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+}
+
+/* Room cards */
+.rooms-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 15px;
+  margin-top: 20px;
+}
+
+.room-card {
+  background-color: white;
+  padding: 20px;
+  border-radius: 8px;
+  text-align: center;
+  font-weight: bold;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.2s;
+}
+
+.room-card:hover {
+  background-color: #f1f5f9;
+  transform: translateY(-2px);
+}
