@@ -27,6 +27,10 @@ const ENBuilding = () => {
   // State to manage the list of rooms and the selected sort option
   const [rooms, setRooms] = useState(initialRooms);
   const [sortOption, setSortOption] = useState('az');
+  
+  // Modal state
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [newRoomName, setNewRoomName] = useState('');
 
   // Function to handle sorting
   const sortRooms = (option) => {
@@ -48,6 +52,22 @@ const ENBuilding = () => {
 
   const selectRoom = (room) => {
     alert(`You selected ${room}`);
+  };
+
+  // Handle opening and closing the modal
+  const toggleModal = () => {
+    setIsModalOpen(!isModalOpen);
+  };
+
+  // Handle adding a new room
+  const handleAddRoom = () => {
+    if (newRoomName.trim() !== '') {
+      setRooms([...rooms, newRoomName]);
+      setNewRoomName('');
+      toggleModal(); // Close modal after adding room
+    } else {
+      alert('Room name cannot be empty');
+    }
   };
 
   return (
@@ -79,7 +99,7 @@ const ENBuilding = () => {
                 </select>
               </div>
               <div className="controls-right">
-                <button onClick={() => (window.location.href = '/add')}>Add</button>
+                <button onClick={toggleModal}>Add</button>
                 <button onClick={() => (window.location.href = '/edit')}>Edit</button>
               </div>
             </div>
@@ -94,6 +114,26 @@ const ENBuilding = () => {
           </div>
         </section>
       </div>
+
+      {/* Modal for adding a new room */}
+      {isModalOpen && (
+        <div className="modal-overlay">
+          <div className="modal">
+            <button className="modal-close" onClick={toggleModal}>×</button>
+            <h2>Add New Room</h2>
+            <input
+              type="text"
+              value={newRoomName}
+              onChange={(e) => setNewRoomName(e.target.value)}
+              placeholder="e.g EN205"
+            />
+            <div className="modal-buttons">
+              <button className="cancel-btn" onClick={toggleModal}>Cancel</button>
+              <button onClick={handleAddRoom}>Add Room</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
