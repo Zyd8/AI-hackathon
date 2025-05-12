@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Device Management</title>
+</head>
+<body>
+    <h2>Add Building</h2>
+    <form method="POST" action="/add_building">
+        <label>Name: <input type="text" name="name" required></label><br>
+        <label>Description: <input type="text" name="description" required></label><br>
+        <button type="submit">Add Building</button>
+    </form>
+
+    <h2>Add Room</h2>
+    <form method="POST" action="/add_room">
+        <label>Name: <input type="text" name="name" required></label><br>
+        <label>Live Camera: <input type="text" name="live_camera" required></label><br>
+        <label>Building ID: <input type="number" name="building_id" required></label><br>
+        <button type="submit">Add Room</button>
+    </form>
+
+    <h2>Add Device</h2>
+    <form method="POST" action="/add_device">
+        <label>Hardware ID: <input type="number" name="hardware_id" required></label><br>
+        <label>Name: <input type="text" name="name" required></label><br>
+        <label>Is Enabled (0/1): <input type="number" name="is_enabled" min="0" max="1" required></label><br>
+        <label>Persons Before Enabled: <input type="number" name="persons_before_enabled" required></label><br>
+        <label>Delay Before Enabled: <input type="number" name="delay_before_enabled" required></label><br>
+        <label>Persons Before Disabled: <input type="number" name="persons_before_disabled" required></label><br>
+        <label>Delay Before Disabled: <input type="number" name="delay_before_disabled" required></label><br>
+        <label>Room ID: <input type="number" name="room_id" required></label><br>
+        <button type="submit">Add Device</button>
+    </form>
+
+    <h2>Current Data</h2>
+    <h3>Buildings</h3>
+    <ul>
+        {% for building in buildings %}
+            <li>{{ building }}</li>
+        {% endfor %}
+    </ul>
+
+    <h3>Rooms</h3>
+    <ul>
+        {% for room in rooms %}
+            <li>{{ room }}</li>
+        {% endfor %}
+    </ul>
+
+    <h3>Devices</h3>
+    <ul>
+        {% for device in devices %}
+            <li>{{ device }}</li>
+        {% endfor %}
+    </ul>
+</body>
+</html>
