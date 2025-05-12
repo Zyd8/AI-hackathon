@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import './App.css';
 
@@ -22,7 +22,29 @@ const BuildingNavbar = () => (
 );
 
 const ENBuilding = () => {
-  const rooms = ['EN401', 'EN402', 'EN403', 'EN404', 'EN405'];
+  const initialRooms = ['EN401', 'EN402', 'EN403', 'EN404', 'EN405'];
+
+  // State to manage the list of rooms and the selected sort option
+  const [rooms, setRooms] = useState(initialRooms);
+  const [sortOption, setSortOption] = useState('az');
+
+  // Function to handle sorting
+  const sortRooms = (option) => {
+    let sortedRooms = [...rooms];
+    if (option === 'az') {
+      sortedRooms.sort(); // Sort alphabetically A–Z
+    } else if (option === 'za') {
+      sortedRooms.sort().reverse(); // Sort alphabetically Z–A
+    }
+    setRooms(sortedRooms); // Update the rooms state with the sorted list
+  };
+
+  // Handler for when the sort option changes
+  const handleSortChange = (e) => {
+    const newSortOption = e.target.value;
+    setSortOption(newSortOption); // Update the selected sort option
+    sortRooms(newSortOption); // Sort the rooms based on the new option
+  };
 
   const selectRoom = (room) => {
     alert(`You selected ${room}`);
@@ -43,13 +65,23 @@ const ENBuilding = () => {
 
         <section className="rooms">
           <div className="rooms-header">
-            <h2>Rooms</h2>
-            <div className="room-controls">
-              <input type="text" id="roomSearch" placeholder="Search..." />
-              <select id="roomSort">
-                <option value="az">A–Z</option>
-                <option value="za">Z–A</option>
-              </select>
+            <h2>Engineering Building Rooms</h2>
+            <div className="controls-container">
+              <div className="controls-left">
+                <input type="text" id="roomSearch" placeholder="Search..." />
+                <select
+                  id="roomSort"
+                  value={sortOption}
+                  onChange={handleSortChange}
+                >
+                  <option value="az">A–Z</option>
+                  <option value="za">Z–A</option>
+                </select>
+              </div>
+              <div className="controls-right">
+                <button onClick={() => (window.location.href = '/add')}>Add</button>
+                <button onClick={() => (window.location.href = '/edit')}>Edit</button>
+              </div>
             </div>
           </div>
 
@@ -60,11 +92,6 @@ const ENBuilding = () => {
               </div>
             ))}
           </div>
-        </section>
-
-        <section className="add-buttons">
-          <button onClick={() => (window.location.href = '/add-device')}>Add Device</button>
-          <button onClick={() => (window.location.href = '/add-room')}>Add Room</button>
         </section>
       </div>
     </div>
