@@ -49,7 +49,7 @@ const DeviceOverview = () => {
   const [editMode, setEditMode] = useState(false);
 
   const toggleEditMode = () => {
-    setEditMode(!editMode); // Placeholder for future functionality
+    setEditMode(!editMode); // Placeholder
   };
 
   const filteredDevices = devices
@@ -60,9 +60,14 @@ const DeviceOverview = () => {
     .sort((a, b) => {
       if (sortOption === 'az') return a.room.localeCompare(b.room);
       if (sortOption === 'za') return b.room.localeCompare(a.room);
-      if (sortOption === 'status') {
+      if (sortOption === 'online') {
         if (a.status === 'Online' && b.status !== 'Online') return -1;
         if (a.status !== 'Online' && b.status === 'Online') return 1;
+        return a.room.localeCompare(b.room);
+      }
+      if (sortOption === 'offline') {
+        if (a.status === 'Offline' && b.status !== 'Offline') return -1;
+        if (a.status !== 'Offline' && b.status === 'Offline') return 1;
         return a.room.localeCompare(b.room);
       }
       return 0;
@@ -111,7 +116,8 @@ const DeviceOverview = () => {
             >
               <option value="az">Room A–Z</option>
               <option value="za">Room Z–A</option>
-              <option value="status">Status</option>
+              <option value="online">Online First</option>
+              <option value="offline">Offline First</option>
             </select>
           </div>
           <div className="controls-right">
