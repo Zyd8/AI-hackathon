@@ -1,217 +1,237 @@
-from flask import Flask, jsonify, request
-import sqlite3
-from flask_cors import CORS
 import os
+from flask import Flask, request, jsonify
+from flask_sqlalchemy import SQLAlchemy
+from flask_cors import CORS
 
 app = Flask(__name__)
 CORS(app)
 
-DB_PATH = ("ai-hackathon.db")
 
-def init_db():
-    print(f"Initializing database at {DB_PATH}")
-    with sqlite3.connect(DB_PATH) as conn:
-        c = conn.cursor()
-        # building Table
-        c.execute('''
-            CREATE TABLE IF NOT EXISTS building (
-                "id"	INTEGER NOT NULL,
-                "name"	TEXT NOT NULL,
-                "description"	TEXT NOT NULL,
-                "path" TEXT NOT NULL,
-                PRIMARY KEY("id" AUTOINCREMENT)
-            )
-        ''')
-        
-        # room Table
-        c.execute('''
-            CREATE TABLE IF NOT EXISTS room (
-                "id"	INTEGER NOT NULL,
-                "name"	TEXT NOT NULL,
-                "live_camera"	TEXT NOT NULL,
-                "building_id"	INTEGER NOT NULL,
-                PRIMARY KEY("id" AUTOINCREMENT),
-                FOREIGN KEY("building_id") REFERENCES "building"("id")
-            )
-        ''')
-        
-        #device Table
-        c.execute('''
-            CREATE TABLE IF NOT EXISTS "device" (
-                "id"	INTEGER NOT NULL,
-                "hardware_id"	INTEGER NOT NULL,
-                "name"	TEXT NOT NULL,
-                "is_enabled"	BOOLEAN NOT NULL,
-                "persons_before_enabled"	INTEGER NOT NULL,
-                "delay_before_enabled"	INTEGER NOT NULL,
-                "persons_before_disabled"	INTEGER NOT NULL,
-                "delay_before_disabled"	INTEGER NOT NULL,
-                "room_id"	INTEGER NOT NULL,
-                PRIMARY KEY("id" AUTOINCREMENT),
-                FOREIGN KEY("room_id") REFERENCES "room"("id")
-            )
-        ''')
+basedir = os.path.abspath(os.path.dirname(__file__))
+app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{os.path.join(basedir, 'ai-hackathon.db')}"
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+db = SQLAlchemy(app)
 
-        conn.commit()
-        print(f"Database initialized successfully. Connected using {DB_PATH}")
+# Admin model
+class Admin(db.Model):
+    username = db.Column(db.String, primary_key=True, nullable=False)
+    password = db.Column(db.String, nullable=False)
 
-init_db()
+class Building(db.Model):
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    name = db.Column(db.String, nullable=False)
+    description = db.Column(db.String, nullable=False)
 
-# building TABLE
-def get_buildings():
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("SELECT name, description, path FROM building") 
-    building = cursor.fetchall()
-    conn.close()
-    # Return the description field as the 'path' field for React
-    return [{"name": name, 'description':description, 'path': path} for name, description, path in building]
+class Room(db.Model):
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    name = db.Column(db.String, nullable=False)
+    live_camera = db.Column(db.String, nullable=False, default='')
+    building_id = db.Column(db.Integer, db.ForeignKey('building.id'), nullable=False)
 
-print(get_buildings())
+class Device(db.Model):
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    hardware_id = db.Column(db.Integer, nullable=False)
+    name = db.Column(db.String, nullable=False)
+    is_enabled = db.Column(db.Boolean, nullable=False)
+    persons_before_enabled = db.Column(db.Integer, nullable=False)
+    delay_before_enabled = db.Column(db.Integer, nullable=False)
+    persons_before_disabled = db.Column(db.Integer, nullable=False)
+    delay_before_disabled = db.Column(db.Integer, nullable=False)
+    room_id = db.Column(db.Integer, db.ForeignKey('room.id'), nullable=False)
 
-# FETCH FROM building TABLE
-@app.route("/api/buildings", methods=["GET"])
-def buildings():
-    return jsonify(get_buildings())
+db_initialized = False
 
-# room TABLE
-@app.route("/api/rooms/<building_name>", methods=["GET"])
-def get_room(building_name):
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
+@app.before_request
+def initialize_database():
+    global db_initialized
+    if not db_initialized:
+        db.create_all()
+        if not Admin.query.filter_by(username='admin').first():
+            new_admin = Admin(username='admin', password='admin123')
+            db.session.add(new_admin)
+            db.session.commit()
+        db_initialized = True
 
-    # Get the building ID using the building name
-    cursor.execute("SELECT id FROM building WHERE name = ?", (building_name,))
-    building_id = cursor.fetchone()
-
-    if not building_id:
-        conn.close()
-        return jsonify({"error": "Building not found"}), 404
-
-    # Fetch rooms belonging to the specific building
-    cursor.execute("SELECT name FROM room WHERE building_id = ?", (building_id[0],))
-    rooms = cursor.fetchall()
-    conn.close()
-
-    # Convert the result to JSON format
-    return jsonify([{"name": name} for name in rooms]) 
-
-#add room Table
-@app.route("/api/rooms/<building_name>", methods=["POST"])
-def add_room(building_name):
+# Login route
+@app.route('/api/login', methods=['POST'])
+def login():
     data = request.get_json()
-    name = data.get("name", "").strip()
-    live_camera = data.get("live_camera", "").strip()
+    username = data.get('username')
+    password = data.get('password')
 
-    # Validate inputs
-    if not name:
-        return jsonify({"error": "Room name cannot be empty"}), 400
-    if not live_camera:
-        return jsonify({"error": "Live camera URL/IP cannot be empty"}), 400
+    admin = Admin.query.filter_by(username=username, password=password).first()
+    if admin:
+        return jsonify({'success': True, 'message': 'Login successful'})
+    else:
+        return jsonify({'success': False, 'message': 'Invalid username or password'}), 401
 
+@app.route('/api/admins', methods=['GET'])
+def get_admins():
+    admins = Admin.query.all()
+    admin_list = [{'username': admin.username, 'password': admin.password} for admin in admins]
+    return jsonify(admin_list)
+
+# get buildings (fetch)
+@app.route('/api/buildings', methods=['GET'])
+def get_buildings():
     try:
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
+        buildings = Building.query.all()
+        
+        # Create a list of dictionaries with building details
+        buildings_list = [{'id': building.id, 'name': building.name, 'description': building.description} for building in buildings]
+        
+        # Return the list as a JSON response
+        return jsonify(buildings_list), 200
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
 
-        # Lookup building ID
-        cursor.execute("SELECT id FROM building WHERE name = ?", (building_name,))
-        b = cursor.fetchone()
-        if not b:
-            return jsonify({"error": f"Building '{building_name}' not found"}), 404
-        building_id = b[0]
 
-        # Insert new room
-        cursor.execute(
-            "INSERT INTO room (name, live_camera, building_id) VALUES (?, ?, ?)",
-            (name, live_camera, building_id)
-        )
-        conn.commit()
+@app.route('/api/buildings', methods=['POST'])
+def add_building():
+    try:
+        data = request.get_json()
+
+        name = data.get('name')
+        description = data.get('description')
+
+        if not name or not description:
+            return jsonify({'success': False, 'message': 'Name and description are required'}), 400
+
+        new_building = Building(name=name, description=description)
+
+
+        db.session.add(new_building)
+        db.session.commit()
+
+        return jsonify({'success': True, 'message': 'Building added successfully'}), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/buildings/<int:building_id>', methods=['PUT'])
+def update_building(building_id):
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'Invalid JSON'}), 400
+
+        name = data.get('name')
+        description = data.get('description')
+
+        if not name or not description:
+            return jsonify({'error': 'Name and description are required'}), 400
+
+        building = Building.query.get(building_id)
+        if not building:
+            return jsonify({'error': 'Building not found'}), 404
+
+        # Update building fields
+        building.name = name
+        building.description = description
+        db.session.commit()
 
         return jsonify({
-            "message": "Room added successfully",
-            "room": {"name": name, "live_camera": live_camera}
-        }), 201
-
-    except sqlite3.IntegrityError:
-        return jsonify({"error": "That room already exists"}), 409
+            'success': True,
+            'message': 'Building updated successfully',
+            'building': {
+                'id': building.id,
+                'name': building.name,
+                'description': building.description
+            }
+        }), 200
 
     except Exception as e:
-        return jsonify({"error": f"Server error: {e}"}), 500
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
 
-    finally:
-        conn.close()
+    
+@app.route('/api/buildings/<int:building_id>/rooms', methods=['GET'])
+def get_rooms(building_id):
+    try:
+        rooms = Room.query.filter_by(building_id=building_id).all()
+        rooms_list = [{'id': room.id, 'name': room.name} for room in rooms]
+        return jsonify(rooms_list), 200
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+    
+@app.route('/api/buildings/<int:building_id>/rooms', methods=['POST'])
+def add_room(building_id):
+    try:
+        data = request.get_json()
+        name = data.get('name')
+        live_camera = data.get('live_camera', '')  
 
-#fetch device from room
-@app.route("/api/devices", methods=["GET"])
-def get_all_devices():
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
+        if not name:
+            return jsonify({'success': False, 'message': 'Room name is required'}), 400
+
+        building = Building.query.get(building_id)
+        if not building:
+            return jsonify({'success': False, 'message': 'Building not found'}), 404
+        
+        new_room = Room(name=name, live_camera=live_camera, building_id=building_id)
+        db.session.add(new_room)
+        db.session.commit()
+
+        return jsonify({'success': True, 'message': 'Room added successfully', 'room': {'id': new_room.id, 'name': new_room.name, 'live_camera': new_room.live_camera}}), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
+@app.route('/api/rooms/<int:room_id>', methods=['PUT'])
+def update_room(room_id):
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'Invalid JSON'}), 400
+
+    name = data.get('name')
+    live_camera = data.get('live_camera')
+
+    if not name:
+        return jsonify({'error': 'Room name is required'}), 400
 
     try:
-        # Select all devices without using table aliases
-        cursor.execute("""
-            SELECT id, name, is_enabled, hardware_id, room_id
-            FROM device
-            ORDER BY name
-        """)
-        rows = cursor.fetchall()  # Change this to fetchall()
+        room = Room.query.get(room_id)
+        if not room:
+            return jsonify({'error': 'Room not found'}), 404
 
-        if not rows:
-            return jsonify({"error": "No devices found"}), 404
-
-        devices = []
-        for id, name, is_enabled, hw_id, room_id in rows:
-            devices.append({
-                "id":id,
-                "name": name,
-                "online": bool(is_enabled),
-                "hardware_id": hw_id,
-                "room": room_id
-            })
-
-        return jsonify(devices)
-
-    except sqlite3.Error as e:
-        print(f"Database error: {e}")
-        return jsonify({"error": "Database query failed"}), 500
-    finally:
-        conn.close()
-
-
-@app.route("/api/devices", methods=["POST"])
-def add_device():
-    device_data = request.get_json()
-    print(f"Received data: {device_data}")
-
-    name = device_data.get('name')
-    room = device_data.get('room')  # Use the room name directly
-    hardware_id = device_data.get('hardware_id')
-    online = device_data.get('online')  # This maps to `is_enabled`
-
-    # Validate required fields
-    if not name or not room or hardware_id is None:
-        return jsonify({"error": "Missing required fields"}), 400
-
+        room.name = name
+        room.live_camera = live_camera
+        db.session.commit()
+        
+        return jsonify({
+    'success': True,
+    'message': 'Room updated successfully',
+    'room': {
+        'id': room.id,
+        'name': room.name,
+        'live_camera': room.live_camera,
+        'building_id': room.building_id
+    }
+}), 200
+    except Exception as e:
+        # Log the error for debugging
+        app.logger.error(f"Error updating room: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+    
+@app.route('/api/rooms/<int:room_id>/devices', methods=['GET'])
+def get_devices(room_id):
     try:
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
+        devices = Device.query.filter_by(room_id=room_id).all()
+        devices_list = [{
+            'id': d.id,
+            'hardware_id': d.hardware_id,
+            'name': d.name,
+            'is_enabled': d.is_enabled,
+            'persons_before_enabled': d.persons_before_enabled,
+            'delay_before_enabled': d.delay_before_enabled,
+            'persons_before_disabled': d.persons_before_disabled,
+            'delay_before_disabled': d.delay_before_disabled
+        } for d in devices]
 
-        # Insert device into the database without looking up room ID
-        cursor.execute("""
-                        INSERT INTO device (name, is_enabled, hardware_id, room_id, 
-                        persons_before_enabled, delay_before_enabled, 
-                        persons_before_disabled, delay_before_disabled)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, ((name, online, hardware_id, room, 0, 0, 0, 0)))
-
-        conn.commit()
-        conn.close()
-
-        return jsonify({"message": "Device added successfully!"}), 201
-    except sqlite3.Error as e:
-        print(f"Database error: {e}")
-        return jsonify({"error": "Database query failed"}), 500
-
+        return jsonify(devices_list), 200
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500 
 
 if __name__ == '__main__':
     app.run(debug=True)

@@ -6,7 +6,7 @@ const Sidebar = () => (
   <div className="sidebar">
     <h2>UEcoManage</h2>
     <Link to="/dashboard" className="active">Dashboard</Link>
-    <Link to="/building-en">EN Building</Link>
+    <Link to="/building">EN Building</Link>
     <Link to="/room">Room</Link>
   </div>
 );
