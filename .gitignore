@@ -1,3 +1,4 @@
 *venv/
 backend/__pycache__/
 backend/ai-hackathon.db
+*node_modules/
