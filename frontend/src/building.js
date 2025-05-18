@@ -53,6 +53,10 @@ const BuildingNavigation = () => {
   const [editBuildingName, setEditBuildingName] = useState('');
   const [editBuildingDescription, setEditBuildingDescription] = useState('');
 
+  // State to manage the list of rooms and the selected sort option
+  const [sortOption, setSortOption] = useState('az');
+  const [searchTerm, setSearchTerm] = useState('');
+
 
   // Fetch buildings from API
   const fetchBuildings = () => {
@@ -147,7 +151,8 @@ const BuildingNavigation = () => {
       alert('Building name cannot be empty');
       return;
     }
-  
+
+    
     axios.put(`http://localhost:5000/api/buildings/${buildingToEdit.id}`, {
       name: editBuildingName,
       description: editBuildingDescription,
@@ -191,6 +196,29 @@ const BuildingNavigation = () => {
         console.error('Failed to update room', err);
       });
   };
+
+  // Function to handle sorting
+  const sortRooms = (option) => {
+    let sortedRooms = [...rooms];
+    if (option === 'az') {
+      sortedRooms.sort(); // Sort alphabetically A–Z
+    } else if (option === 'za') {
+      sortedRooms.sort().reverse(); // Sort alphabetically Z–A
+    }
+    setRooms(sortedRooms); // Update the rooms state with the sorted list
+  };
+
+  // Handler for when the sort option changes
+  const handleSortChange = (e) => {
+    const newSortOption = e.target.value;
+    setSortOption(newSortOption); // Update the selected sort option
+    sortRooms(newSortOption); // Sort the rooms based on the new option
+  };
+
+  // Filtered rooms based on search term
+const filteredRooms = rooms.filter(room =>
+  room.name.toLowerCase().includes(searchTerm.toLowerCase())
+);
 
   // Fetch devices for a room and open modal
   const fetchDevices = (room) => {
@@ -314,12 +342,30 @@ const BuildingNavigation = () => {
           </div>
         </div>
       )}
-      
+
         {/* Rooms Section */}
         {selectedBuilding && (
           <section className="rooms">
             <div className="rooms-header">
               <h2>Rooms in {selectedBuilding.name}</h2>
+              <div className="controls-container">
+              <div className="controls-left">
+                <input 
+                type="text" 
+                id="roomSearch" 
+                placeholder="Search..." 
+                value ={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)} />
+                
+                <select
+                  id="roomSort"
+                  value={sortOption}
+                  onChange={handleSortChange}
+                >
+                  <option value="az">A–Z</option>
+                  <option value="za">Z–A</option>
+                </select>
+              </div>
               <div className="controls-right">
                 <button onClick={() => {
                   setShowAddRoomModal(true);
@@ -328,11 +374,12 @@ const BuildingNavigation = () => {
                   Add Room
                 </button>
                 <button onClick={() => setShowEditRoomModal(true)}>Edit Room</button>
+                </div>
               </div>
             </div>
 
             <div className="rooms-grid">
-              {rooms.map((room) => (
+              {filteredRooms.map((room) => (
                 <div
                   key={room.id}
                   className="room-card"
