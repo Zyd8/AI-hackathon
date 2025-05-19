@@ -379,6 +379,8 @@ const filteredRooms = rooms.filter(room =>
             </div>
 
             <div className="rooms-grid">
+                // Renders each room in the filtered rooms list as a clickable card, 
+                // allowing users to view devices associated with the room.
               {filteredRooms.map((room) => (
                 <div
                   key={room.id}
