@@ -1,0 +1,17 @@
+Flask
+Flask-SQLAlchemy
+Flask-CORS
+SQLAlchemy
+Werkzeug
+Jinja2
+itsdangerous
+click
+python-dotenv
+ultralytics
+opencv-python-headless
+torch
+torchvision
+numpy
+pytest  
+black
+flake8
