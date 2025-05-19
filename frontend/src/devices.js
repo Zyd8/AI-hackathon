@@ -16,6 +16,44 @@ const DevicesPage = () => {
   const [devices, setDevices] = useState([]);
   const [room, setRoom] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [cameraAvailable, setCameraAvailable] = useState(false);
+  const [cameraLoading, setCameraLoading] = useState(true);
+  const [cameraError, setCameraError] = useState(null);
+  const [cameraUrl, setCameraUrl] = useState('');
+  
+  // Add a timestamp to force image refresh
+  const [timestamp, setTimestamp] = useState(Date.now());
+  
+  // Refresh camera feed every second
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTimestamp(Date.now());
+    }, 1000);
+    
+    return () => clearInterval(interval);
+  }, []);
+  
+  // Check camera status when room changes
+  useEffect(() => {
+    const checkCameraStatus = async () => {
+      if (!roomId) return;
+      
+      try {
+        setCameraLoading(true);
+        const response = await axios.get(`http://localhost:5000/api/camera/status/${roomId}`);
+        setCameraAvailable(response.data.available);
+        setCameraUrl(response.data.camera_url || '');
+      } catch (error) {
+        console.error('Error checking camera status:', error);
+        setCameraError('Failed to check camera status');
+        setCameraAvailable(false);
+      } finally {
+        setCameraLoading(false);
+      }
+    };
+    
+    checkCameraStatus();
+  }, [roomId]);
   
   // Modal states
   const [showAddDeviceModal, setShowAddDeviceModal] = useState(false);
@@ -183,6 +221,9 @@ const DevicesPage = () => {
   if (loading) {
     return <div>Loading...</div>;
   }
+  
+  // Generate camera feed URL with timestamp to prevent caching
+  const cameraFeedUrl = `http://localhost:5000/api/camera/feed/${roomId}?t=${timestamp}`;
 
   if (!room) {
     return <div>Room not found</div>;
@@ -192,16 +233,53 @@ const DevicesPage = () => {
     <div className="app">
       <Sidebar />
       <div className="main-content">
-        <div className="header">
-          <h1>{room.name} - Devices</h1>
-          <button 
-            className="add-button" 
-            onClick={() => setShowAddDeviceModal(true)}
-          >
-            + Add Device
-          </button>
-        </div>
+        <header>
+          <h1>Devices in {room?.name}</h1>
+          <p style={{ color: '#475569', marginTop: '10px' }}>
+            {room?.buildingName} • {devices.length} {devices.length === 1 ? 'device' : 'devices'}
+          </p>
+
+          <div className="controls-right">
+            <button onClick={() => setShowAddDeviceModal(true)}>Add Device</button>
+          </div>
+        </header>
         
+        {/* Camera Feed Section */}
+        <div className="camera-feed-container">
+          {cameraLoading ? (
+            <div className="camera-loading">Loading camera feed...</div>
+          ) : cameraAvailable ? (
+            <div className="camera-feed">
+              <img 
+                src={cameraFeedUrl} 
+                alt="Live camera feed" 
+                onError={(e) => {
+                  console.error('Error loading camera feed');
+                  setCameraAvailable(false);
+                }}
+              />
+              <div className="camera-info">
+                <span className="camera-status active">LIVE</span>
+                <span className="camera-url" title={cameraUrl}>
+                  {cameraUrl.length > 30 ? `${cameraUrl.substring(0, 27)}...` : cameraUrl}
+                </span>
+              </div>
+            </div>
+          ) : (
+            <div className="camera-unavailable">
+              <div className="camera-icon">📷</div>
+              <p>Camera feed is not available</p>
+              {cameraError && <p className="error-message">{cameraError}</p>}
+              <button 
+                className="retry-button"
+                onClick={() => window.location.reload()}
+              >
+                Retry
+              </button>
+            </div>
+          )}
+        </div>
+
         <div className="devices-grid">
           {devices.map((device) => (
             <div key={device.id} className="device-card">

@@ -1,7 +1,8 @@
 import os
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, Response
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
+from camera import camera_service
 
 app = Flask(__name__)
 CORS(app)
@@ -365,6 +366,47 @@ def delete_device(device_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/camera/feed/<int:room_id>')
+def camera_feed(room_id):
+    """Video streaming route. Put this in the src attribute of an img tag."""
+    room = Room.query.get(room_id)
+    if not room or not room.live_camera:
+        return jsonify({'error': 'Camera not found or not configured'}), 404
+    
+    # Add camera if not already added
+    camera_service.add_camera(str(room_id), room.live_camera)
+    
+    def generate():
+        while True:
+            frame = camera_service.get_frame(str(room_id))
+            if frame is None:
+                break
+            yield (b'--frame\r\n'
+                   b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+    
+    return Response(generate(),
+                   mimetype='multipart/x-mixed-replace; boundary=frame')
+
+@app.route('/api/camera/status/<int:room_id>')
+def camera_status(room_id):
+    """Check if camera is available."""
+    room = Room.query.get(room_id)
+    if not room or not room.live_camera:
+        return jsonify({'available': False, 'message': 'Camera not configured'})
+    
+    camera_service.add_camera(str(room_id), room.live_camera)
+    frame = camera_service.get_frame(str(room_id))
+    
+    return jsonify({
+        'available': frame is not None,
+        'has_camera': True,
+        'camera_url': room.live_camera
+    })
+
+# Add cleanup on app exit
+import atexit
+atexit.register(camera_service.cleanup)
 
 if __name__ == '__main__':
     app.run(debug=True)
