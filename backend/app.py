@@ -47,7 +47,7 @@ def initialize_database():
     if not db_initialized:
         db.create_all()
         if not Admin.query.filter_by(username='admin').first():
-            new_admin = Admin(username='admin', password='admin123')
+            new_admin = Admin(username='admin', password='admin')
             db.session.add(new_admin)
             db.session.commit()
         db_initialized = True
