@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import './App.css';
 
@@ -8,16 +9,29 @@ const Sidebar = () => (
   </div>
 );
 
-const BuildingNavbar = ({ buildings, onSelectBuilding, activeBuilding }) => (
+const BuildingNavbar = ({ buildings, onSelectBuilding, activeBuilding, onDeleteBuilding }) => (
   <nav className="building-navbar">
     {buildings.map((building) => (
-      <button
-        key={building.id}
-        className={activeBuilding?.id === building.id ? "active" : ""}
-        onClick={() => onSelectBuilding(building)}
-      >
-        {building.name}
-      </button>
+      <div key={building.id} className="building-nav-item">
+        <button
+          className={activeBuilding?.id === building.id ? "active" : ""}
+          onClick={() => onSelectBuilding(building)}
+        >
+          {building.name}
+        </button>
+        <button 
+          className="delete-building-btn"
+          onClick={(e) => {
+            e.stopPropagation();
+            if (window.confirm(`Are you sure you want to delete ${building.name}? This will also delete all rooms and devices in it.`)) {
+              onDeleteBuilding(building.id);
+            }
+          }}
+          title="Delete building"
+        >
+          ×
+        </button>
+      </div>
     ))}
   </nav>
 );
@@ -216,9 +230,35 @@ const BuildingNavigation = () => {
   };
 
   // Filtered rooms based on search term
-const filteredRooms = rooms.filter(room =>
-  room.name.toLowerCase().includes(searchTerm.toLowerCase())
-);
+  const filteredRooms = rooms.filter(room =>
+    room.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  // Delete a building
+  const deleteBuilding = async (buildingId) => {
+    try {
+      await axios.delete(`http://localhost:5000/api/buildings/${buildingId}`);
+      // Refresh buildings list
+      fetchBuildings();
+    } catch (error) {
+      console.error('Error deleting building:', error);
+      alert('Failed to delete building. Please try again.');
+    }
+  };
+
+  // Delete a room
+  const deleteRoom = async (roomId) => {
+    try {
+      await axios.delete(`http://localhost:5000/api/rooms/${roomId}`);
+      // Refresh rooms list if we have a selected building
+      if (selectedBuilding) {
+        fetchRooms(selectedBuilding);
+      }
+    } catch (error) {
+      console.error('Error deleting room:', error);
+      alert('Failed to delete room. Please try again.');
+    }
+  };
 
   // Fetch devices for a room and open modal
   const fetchDevices = (room) => {
@@ -239,10 +279,10 @@ const filteredRooms = rooms.filter(room =>
     setDevices([]);
   };
 
+  const navigate = useNavigate();
+  
   return (
-    <div className="dashboard-container">
-      <Sidebar />
-      <div className="main">
+    <div className="main">
         <header>
           <h1>UEcoManage Admin</h1>
           <p style={{ color: '#475569', marginTop: '10px' }}>
@@ -273,6 +313,7 @@ const filteredRooms = rooms.filter(room =>
           buildings={buildings}
           activeBuilding={selectedBuilding}
           onSelectBuilding={fetchRooms}
+          onDeleteBuilding={deleteBuilding}
         />
 
         {/* Add Building Modal */}
@@ -374,20 +415,60 @@ const filteredRooms = rooms.filter(room =>
                   Add Room
                 </button>
                 <button onClick={() => setShowEditRoomModal(true)}>Edit Room</button>
-                </div>
+                <button 
+                  onClick={() => {
+                    if (!selectedRoom) {
+                      alert("Please select a room to delete");
+                      return;
+                    }
+                    if (window.confirm(`Are you sure you want to delete ${selectedRoom.name}? This will also delete all devices in it.`)) {
+                      deleteRoom(selectedRoom.id);
+                    }
+                  }}
+                >
+                  Delete Room
+                </button>
+              </div>
               </div>
             </div>
 
             <div className="rooms-grid">
-                // Renders each room in the filtered rooms list as a clickable card, 
-                // allowing users to view devices associated with the room.
+              {/* Renders each room in the filtered rooms list as a clickable card,
+                  allowing users to view devices associated with the room. */}
               {filteredRooms.map((room) => (
                 <div
                   key={room.id}
                   className="room-card"
-                  onClick={() => fetchDevices(room)}
+                  onClick={() => navigate(`/devices/${room.id}`)}
                 >
-                  {room.name}
+                  <div className="room-card-content">
+                    {room.name}
+                  </div>
+                  <button 
+                    className="edit-room-btn"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setRoomToEditId(room.id);
+                      setEditRoomName(room.name);
+                      setEditRoomCamera(room.live_camera || '');
+                      setShowEditRoomModal(true);
+                    }}
+                    title="Edit room"
+                  >
+                    ✎
+                  </button>
+                  <button 
+                    className="delete-room-btn"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (window.confirm(`Are you sure you want to delete ${room.name}? This will also delete all devices in it.`)) {
+                        deleteRoom(room.id);
+                      }
+                    }}
+                    title="Delete room"
+                  >
+                    ×
+                  </button>
                 </div>
               ))}
             </div>
@@ -499,7 +580,6 @@ const filteredRooms = rooms.filter(room =>
           </div>
         )}
       </div>
-    </div>
   );
 };
 

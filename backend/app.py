@@ -178,41 +178,68 @@ def add_room(building_id):
         return jsonify({'success': False, 'message': str(e)}), 500
 
 
-@app.route('/api/rooms/<int:room_id>', methods=['PUT'])
-def update_room(room_id):
-    data = request.get_json()
-    if not data:
-        return jsonify({'error': 'Invalid JSON'}), 400
+@app.route('/api/rooms/<int:room_id>', methods=['PUT', 'DELETE'])
+def handle_room(room_id):
+    if request.method == 'PUT':
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'Invalid JSON'}), 400
 
-    name = data.get('name')
-    live_camera = data.get('live_camera')
+        name = data.get('name')
+        live_camera = data.get('live_camera')
 
-    if not name:
-        return jsonify({'error': 'Room name is required'}), 400
+        if not name:
+            return jsonify({'error': 'Room name is required'}), 400
 
-    try:
-        room = Room.query.get(room_id)
-        if not room:
-            return jsonify({'error': 'Room not found'}), 404
+        try:
+            room = Room.query.get(room_id)
+            if not room:
+                return jsonify({'error': 'Room not found'}), 404
 
-        room.name = name
-        room.live_camera = live_camera
-        db.session.commit()
-        
-        return jsonify({
-    'success': True,
-    'message': 'Room updated successfully',
-    'room': {
-        'id': room.id,
-        'name': room.name,
-        'live_camera': room.live_camera,
-        'building_id': room.building_id
-    }
-}), 200
-    except Exception as e:
-        # Log the error for debugging
-        app.logger.error(f"Error updating room: {e}")
-        return jsonify({'error': 'Internal server error'}), 500
+            room.name = name
+            room.live_camera = live_camera
+            db.session.commit()
+            
+            return jsonify({
+                'success': True,
+                'message': 'Room updated successfully',
+                'room': {
+                    'id': room.id,
+                    'name': room.name,
+                    'live_camera': room.live_camera,
+                    'building_id': room.building_id
+                }
+            }), 200
+        except Exception as e:
+            # Log the error for debugging
+            app.logger.error(f"Error updating room: {e}")
+            return jsonify({'error': 'Internal server error'}), 500
+    
+    elif request.method == 'DELETE':
+        try:
+            room = Room.query.get(room_id)
+            if not room:
+                return jsonify({'success': False, 'message': 'Room not found'}), 404
+            
+            # First delete all devices in the room
+            Device.query.filter_by(room_id=room_id).delete()
+            
+            # Then delete the room
+            db.session.delete(room)
+            db.session.commit()
+            
+            return jsonify({
+                'success': True,
+                'message': 'Room and all associated devices deleted successfully'
+            }), 200
+            
+        except Exception as e:
+            db.session.rollback()
+            app.logger.error(f"Error deleting room: {e}")
+            return jsonify({
+                'success': False,
+                'message': 'Failed to delete room. Please try again.'
+            }), 500
     
 @app.route('/api/rooms/<int:room_id>/devices', methods=['GET'])
 def get_devices(room_id):
@@ -226,12 +253,118 @@ def get_devices(room_id):
             'persons_before_enabled': d.persons_before_enabled,
             'delay_before_enabled': d.delay_before_enabled,
             'persons_before_disabled': d.persons_before_disabled,
-            'delay_before_disabled': d.delay_before_disabled
+            'delay_before_disabled': d.delay_before_disabled,
+            'room_id': d.room_id
         } for d in devices]
 
         return jsonify(devices_list), 200
     except Exception as e:
-        return jsonify({'success': False, 'message': str(e)}), 500 
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/rooms/<int:room_id>/devices', methods=['POST'])
+def add_device(room_id):
+    try:
+        data = request.get_json()
+        
+        # Validate required fields
+        required_fields = ['hardware_id', 'name', 'is_enabled', 
+                         'persons_before_enabled', 'delay_before_enabled',
+                         'persons_before_disabled', 'delay_before_disabled']
+        
+        for field in required_fields:
+            if field not in data:
+                return jsonify({'success': False, 'message': f'Missing required field: {field}'}), 400
+        
+        # Create new device
+        new_device = Device(
+            hardware_id=data['hardware_id'],
+            name=data['name'],
+            is_enabled=data['is_enabled'],
+            persons_before_enabled=data['persons_before_enabled'],
+            delay_before_enabled=data['delay_before_enabled'],
+            persons_before_disabled=data['persons_before_disabled'],
+            delay_before_disabled=data['delay_before_disabled'],
+            room_id=room_id
+        )
+        
+        db.session.add(new_device)
+        db.session.commit()
+        
+        return jsonify({
+            'id': new_device.id,
+            'hardware_id': new_device.hardware_id,
+            'name': new_device.name,
+            'is_enabled': new_device.is_enabled,
+            'persons_before_enabled': new_device.persons_before_enabled,
+            'delay_before_enabled': new_device.delay_before_enabled,
+            'persons_before_disabled': new_device.persons_before_disabled,
+            'delay_before_disabled': new_device.delay_before_disabled,
+            'room_id': new_device.room_id
+        }), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/devices/<int:device_id>', methods=['PUT'])
+def update_device(device_id):
+    try:
+        data = request.get_json()
+        device = Device.query.get(device_id)
+        
+        if not device:
+            return jsonify({'success': False, 'message': 'Device not found'}), 404
+        
+        # Update fields if they exist in the request
+        if 'hardware_id' in data:
+            device.hardware_id = data['hardware_id']
+        if 'name' in data:
+            device.name = data['name']
+        if 'is_enabled' in data:
+            device.is_enabled = data['is_enabled']
+        if 'persons_before_enabled' in data:
+            device.persons_before_enabled = data['persons_before_enabled']
+        if 'delay_before_enabled' in data:
+            device.delay_before_enabled = data['delay_before_enabled']
+        if 'persons_before_disabled' in data:
+            device.persons_before_disabled = data['persons_before_disabled']
+        if 'delay_before_disabled' in data:
+            device.delay_before_disabled = data['delay_before_disabled']
+        
+        db.session.commit()
+        
+        return jsonify({
+            'id': device.id,
+            'hardware_id': device.hardware_id,
+            'name': device.name,
+            'is_enabled': device.is_enabled,
+            'persons_before_enabled': device.persons_before_enabled,
+            'delay_before_enabled': device.delay_before_enabled,
+            'persons_before_disabled': device.persons_before_disabled,
+            'delay_before_disabled': device.delay_before_disabled,
+            'room_id': device.room_id
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/devices/<int:device_id>', methods=['DELETE'])
+def delete_device(device_id):
+    try:
+        device = Device.query.get(device_id)
+        
+        if not device:
+            return jsonify({'success': False, 'message': 'Device not found'}), 404
+        
+        db.session.delete(device)
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': 'Device deleted successfully'}), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True)
