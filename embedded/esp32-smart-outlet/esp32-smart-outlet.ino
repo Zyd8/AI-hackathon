@@ -3,18 +3,24 @@
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
 #include <EEPROM.h>
+#include <string>
 
 // Pin configuration
 #define RELAY_PIN 26
+#define LED_CONNECTION 2  // D2 for connection status
+#define LED_RELAY_STATE 4 // D4 for relay state
 
 // Constants
 #define HARDWARE_ID_LENGTH 32
-#define EEPROM_SIZE 64
+#define IP_ADDRESS_LENGTH 16  // For storing IP address (e.g., "192.168.1.100")
+#define EEPROM_SIZE 128      // Increased to accommodate both hardware ID and IP
 #define HARDWARE_ID_ADDR 0
+#define IP_ADDRESS_ADDR 64   // Start address for IP in EEPROM
 #define STATUS_CHECK_INTERVAL 5000  // 5 seconds
 
 // WiFi and server settings
-const char* serverUrl = "http://192.168.1.22:5000";  // Update with your backend IP
+char serverUrl[64];  // Will be constructed from IP
+char backendIp[IP_ADDRESS_LENGTH] = "192.168.1.22";  // Default IP
 char hardwareId[HARDWARE_ID_LENGTH + 1] = "";
 unsigned long lastStatusCheck = 0;
 
@@ -27,16 +33,29 @@ void checkDeviceStatus();
 void updateRelayState(bool state);
 void saveHardwareId();
 void loadHardwareId();
+void saveBackendIp();
+void loadBackendIp();
+void updateServerUrl();
 
 void setup() {
   // Initialize serial and hardware
   Serial.begin(115200);
+  
+  // Initialize pins
   pinMode(RELAY_PIN, OUTPUT);
-  digitalWrite(RELAY_PIN, HIGH);  // Start with relay off
+  pinMode(LED_CONNECTION, OUTPUT);
+  pinMode(LED_RELAY_STATE, OUTPUT);
+  
+  // Start with relay off and LEDs off
+  digitalWrite(RELAY_PIN, HIGH);
+  digitalWrite(LED_CONNECTION, LOW);
+  digitalWrite(LED_RELAY_STATE, LOW);
 
-  // Initialize EEPROM and load hardware ID
+  // Initialize EEPROM and load settings
   EEPROM.begin(EEPROM_SIZE);
   loadHardwareId();
+  loadBackendIp();
+  updateServerUrl();
   
   // If no hardware ID is set, generate a default one
   if (strlen(hardwareId) == 0) {
@@ -49,7 +68,10 @@ void setup() {
 
   // WiFi Manager setup
   WiFiManagerParameter custom_hardware_id("hardware_id", "Hardware ID (Required)", hardwareId, HARDWARE_ID_LENGTH + 1);
+  WiFiManagerParameter custom_backend_ip("backend_ip", "Backend IP (e.g., 192.168.1.22)", backendIp, IP_ADDRESS_LENGTH);
+  
   wifiManager.addParameter(&custom_hardware_id);
+  wifiManager.addParameter(&custom_backend_ip);
   
   // Try to connect to WiFi
   if (!wifiManager.autoConnect("ESP32-SmartOutlet")) {
@@ -57,20 +79,43 @@ void setup() {
     ESP.restart();
   }
 
-  // Save hardware ID if changed
+  // Save settings if changed
+  bool settingsChanged = false;
+  
+  // Check hardware ID
   if (strcmp(custom_hardware_id.getValue(), hardwareId) != 0) {
     strncpy(hardwareId, custom_hardware_id.getValue(), HARDWARE_ID_LENGTH);
     hardwareId[HARDWARE_ID_LENGTH] = '\0';
     saveHardwareId();
+    settingsChanged = true;
+  }
+  
+  // Check backend IP
+  if (strcmp(custom_backend_ip.getValue(), backendIp) != 0) {
+    strncpy(backendIp, custom_backend_ip.getValue(), IP_ADDRESS_LENGTH - 1);
+    backendIp[IP_ADDRESS_LENGTH - 1] = '\0';
+    saveBackendIp();
+    updateServerUrl();
+    settingsChanged = true;
+  }
+  
+  if (settingsChanged) {
+    Serial.println("Settings updated, restarting...");
+    delay(1000);
+    ESP.restart();
   }
   
   // Print connection info
   Serial.println("\n=== Smart Outlet ===");
   Serial.print("Hardware ID: ");
   Serial.println(hardwareId);
-  Serial.print("Backend: ");
+  Serial.print("Backend IP: ");
+  Serial.println(backendIp);
+  Serial.print("Backend URL: ");
   Serial.println(serverUrl);
   Serial.print("Local IP: ");
+  Serial.println(WiFi.localIP());
+  Serial.println("===================\n");
   Serial.println(WiFi.localIP());
   Serial.println("===================\n");
 
@@ -90,8 +135,19 @@ void updateRelayState(bool state) {
   // Invert the logic for normally open relay
   // HIGH = relay off (circuit open), LOW = relay on (circuit closed)
   digitalWrite(RELAY_PIN, state ? LOW : HIGH);
+  // Update relay state LED (D4)
+  digitalWrite(LED_RELAY_STATE, state ? HIGH : LOW);
   Serial.print("Relay set to: ");
   Serial.println(state ? "ON (LOW)" : "OFF (HIGH)");
+}
+
+void blinkConnectionLED(int times = 1, int delayMs = 200) {
+  for (int i = 0; i < times; i++) {
+    digitalWrite(LED_CONNECTION, HIGH);
+    delay(delayMs);
+    digitalWrite(LED_CONNECTION, LOW);
+    if (i < times - 1) delay(delayMs);
+  }
 }
 
 void saveHardwareId() {
@@ -114,19 +170,63 @@ void loadHardwareId() {
   hardwareId[i] = '\0';
 }
 
+void saveBackendIp() {
+  for (int i = 0; i < strlen(backendIp); i++) {
+    EEPROM.write(IP_ADDRESS_ADDR + i, backendIp[i]);
+  }
+  EEPROM.write(IP_ADDRESS_ADDR + strlen(backendIp), '\0');
+  EEPROM.commit();
+  Serial.print("Saved backend IP: ");
+  Serial.println(backendIp);
+}
+
+void loadBackendIp() {
+  int i = 0;
+  char ch = EEPROM.read(IP_ADDRESS_ADDR + i);
+
+  // If no IP is saved, use default
+  if (ch == 0xFF) {
+    strncpy(backendIp, "192.168.1.22", IP_ADDRESS_LENGTH - 1);
+    backendIp[IP_ADDRESS_LENGTH - 1] = '\0';
+    saveBackendIp();
+    return;
+  }
+
+  while (ch != '\0' && i < IP_ADDRESS_LENGTH - 1) {
+    backendIp[i] = ch;
+    i++;
+    ch = EEPROM.read(IP_ADDRESS_ADDR + i);
+  }
+  backendIp[i] = '\0';
+  Serial.print("Loaded backend IP: ");
+  Serial.println(backendIp);
+}
+
+void updateServerUrl() {
+  snprintf(serverUrl, sizeof(serverUrl), "http://%s:5000", backendIp);
+  Serial.print("Updated server URL to: ");
+  Serial.println(serverUrl);
+}
+
 void checkDeviceStatus() {
   Serial.println("\n--- Checking device status ---");
   Serial.print("WiFi status: ");
   Serial.println(WiFi.status() == WL_CONNECTED ? "Connected" : "Disconnected");
   
   if (WiFi.status() != WL_CONNECTED) {
+    digitalWrite(LED_CONNECTION, LOW); // Turn off connection LED
     Serial.println("WiFi not connected, attempting to reconnect...");
     WiFi.reconnect();
     delay(1000); // Give some time for reconnection
     if (WiFi.status() == WL_CONNECTED) {
       Serial.println("Successfully reconnected to WiFi");
+      blinkConnectionLED(3, 100); // Triple blink on successful connection
     } else {
       Serial.println("Failed to reconnect to WiFi");
+      // Blink once to indicate connection failure
+      digitalWrite(LED_CONNECTION, HIGH);
+      delay(100);
+      digitalWrite(LED_CONNECTION, LOW);
     }
     return;
   }
@@ -153,6 +253,11 @@ void checkDeviceStatus() {
   Serial.println(httpCode);
   
   if (httpCode == HTTP_CODE_OK) {
+    // Blink connection LED to indicate successful communication
+    digitalWrite(LED_CONNECTION, HIGH);
+    delay(50);
+    digitalWrite(LED_CONNECTION, LOW);
+    
     String payload = http.getString();
     Serial.print("Response payload: ");
     Serial.println(payload);
