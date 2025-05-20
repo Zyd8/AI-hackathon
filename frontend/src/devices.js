@@ -24,35 +24,52 @@ const DevicesPage = () => {
   // Add a timestamp to force image refresh
   const [timestamp, setTimestamp] = useState(Date.now());
   
-  // Refresh camera feed every second
+  // Refresh camera feed only when camera is available and component is mounted
   useEffect(() => {
+    if (!cameraAvailable || !cameraUrl) return;
+    
     const interval = setInterval(() => {
       setTimestamp(Date.now());
     }, 1000);
     
-    return () => clearInterval(interval);
-  }, []);
+    return () => {
+      clearInterval(interval);
+    };
+  }, [cameraAvailable, cameraUrl]);
   
   // Check camera status when room changes
   useEffect(() => {
+    let isMounted = true;
+    
     const checkCameraStatus = async () => {
       if (!roomId) return;
       
       try {
         setCameraLoading(true);
         const response = await axios.get(`http://localhost:5000/api/camera/status/${roomId}`);
-        setCameraAvailable(response.data.available);
-        setCameraUrl(response.data.camera_url || '');
+        if (isMounted) {
+          setCameraAvailable(response.data.available);
+          setCameraUrl(response.data.camera_url || '');
+        }
       } catch (error) {
         console.error('Error checking camera status:', error);
-        setCameraError('Failed to check camera status');
-        setCameraAvailable(false);
+        if (isMounted) {
+          setCameraError('Failed to check camera status');
+          setCameraAvailable(false);
+        }
       } finally {
-        setCameraLoading(false);
+        if (isMounted) {
+          setCameraLoading(false);
+        }
       }
     };
     
     checkCameraStatus();
+    
+    // Cleanup function
+    return () => {
+      isMounted = false;
+    };
   }, [roomId]);
   
   // Modal states
