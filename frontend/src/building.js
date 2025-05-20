@@ -2,10 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import './App.css';
+import { FaHome, FaBuilding, FaDoorOpen } from 'react-icons/fa';
 
 const Sidebar = () => (
   <div className="sidebar">
     <h2>UEcoManage</h2>
+    <a href="/dashboard" className="sidebar-link"><FaHome style={{marginRight:8}}/>Dashboard</a>
+    <a href="/building" className="sidebar-link active"><FaBuilding style={{marginRight:8}}/>Building</a>
+    <a href="/room" className="sidebar-link"><FaDoorOpen style={{marginRight:8}}/>Room</a>
   </div>
 );
 
@@ -282,7 +286,9 @@ const BuildingNavigation = () => {
   const navigate = useNavigate();
   
   return (
-    <div className="main">
+    <div style={{display:'flex',minHeight:'100vh'}}>
+      <Sidebar />
+      <div className="main">
         <header>
           <h1>UEcoManage Admin</h1>
           <p style={{ color: '#475569', marginTop: '10px' }}>
@@ -580,6 +586,7 @@ const BuildingNavigation = () => {
           </div>
         )}
       </div>
+    </div>
   );
 };
 

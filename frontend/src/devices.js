@@ -3,10 +3,14 @@ import axios from 'axios';
 import { useParams, useNavigate } from 'react-router-dom';
 import './App.css';
 import './ToggleSwitch.css';
+import { FaHome, FaBuilding, FaDoorOpen } from 'react-icons/fa';
 
 const Sidebar = () => (
   <div className="sidebar">
     <h2>UEcoManage</h2>
+    <a href="/dashboard" className="sidebar-link"><FaHome style={{marginRight:8}}/>Dashboard</a>
+    <a href="/building" className="sidebar-link"><FaBuilding style={{marginRight:8}}/>Building</a>
+    <a href="/room" className="sidebar-link active"><FaDoorOpen style={{marginRight:8}}/>Room</a>
   </div>
 );
 
@@ -291,18 +295,14 @@ const DevicesPage = () => {
   }
 
   return (
-    <div className="app">
+    <div style={{display:'flex',minHeight:'100vh'}}>
       <Sidebar />
-      <div className="main-content">
+      <div className="main">
         <header>
           <h1>Devices in {room?.name}</h1>
           <p style={{ color: '#475569', marginTop: '10px' }}>
             {room?.buildingName} • {devices.length} {devices.length === 1 ? 'device' : 'devices'}
           </p>
-
-          <div className="controls-right">
-            <button onClick={() => setShowAddDeviceModal(true)}>Add Device</button>
-          </div>
         </header>
         
         {/* Camera Feed Section */}
@@ -340,6 +340,11 @@ const DevicesPage = () => {
             </div>
           )}
         </div>
+
+        <div className="controls-right">
+          <button onClick={() => setShowAddDeviceModal(true)}>Add Device</button>
+        </div>
+
 
         <div className="devices-grid">
           {devices.map((device) => (
