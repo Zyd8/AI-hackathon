@@ -32,7 +32,7 @@ void setup() {
   // Initialize serial and hardware
   Serial.begin(115200);
   pinMode(RELAY_PIN, OUTPUT);
-  digitalWrite(RELAY_PIN, LOW);  // Start with relay off
+  digitalWrite(RELAY_PIN, HIGH);  // Start with relay off
 
   // Initialize EEPROM and load hardware ID
   EEPROM.begin(EEPROM_SIZE);
@@ -87,9 +87,11 @@ void loop() {
 }
 
 void updateRelayState(bool state) {
-  digitalWrite(RELAY_PIN, state ? HIGH : LOW);
+  // Invert the logic for normally open relay
+  // HIGH = relay off (circuit open), LOW = relay on (circuit closed)
+  digitalWrite(RELAY_PIN, state ? LOW : HIGH);
   Serial.print("Relay set to: ");
-  Serial.println(state ? "ON" : "OFF");
+  Serial.println(state ? "ON (LOW)" : "OFF (HIGH)");
 }
 
 void saveHardwareId() {
@@ -113,48 +115,110 @@ void loadHardwareId() {
 }
 
 void checkDeviceStatus() {
+  Serial.println("\n--- Checking device status ---");
+  Serial.print("WiFi status: ");
+  Serial.println(WiFi.status() == WL_CONNECTED ? "Connected" : "Disconnected");
+  
   if (WiFi.status() != WL_CONNECTED) {
-    Serial.println("WiFi not connected, reconnecting...");
+    Serial.println("WiFi not connected, attempting to reconnect...");
     WiFi.reconnect();
+    delay(1000); // Give some time for reconnection
+    if (WiFi.status() == WL_CONNECTED) {
+      Serial.println("Successfully reconnected to WiFi");
+    } else {
+      Serial.println("Failed to reconnect to WiFi");
+    }
     return;
   }
 
   // Create the URL for the API request
   String url = String(serverUrl) + "/api/device/status?hardware_id=" + String(hardwareId);
+  Serial.print("Requesting URL: ");
+  Serial.println(url);
   
   // Make the HTTP GET request
   HTTPClient http;
-  http.begin(url);
+  http.setConnectTimeout(5000);  // 5 second timeout
+  http.setTimeout(5000);        // 5 second timeout
+  
+  bool httpBegin = http.begin(url);
+  if (!httpBegin) {
+    Serial.println("Failed to begin HTTP connection");
+    return;
+  }
+  
+  Serial.println("Sending GET request...");
   int httpCode = http.GET();
+  Serial.print("HTTP Status code: ");
+  Serial.println(httpCode);
   
   if (httpCode == HTTP_CODE_OK) {
     String payload = http.getString();
+    Serial.print("Response payload: ");
+    Serial.println(payload);
+    
     DynamicJsonDocument doc(1024);
     DeserializationError error = deserializeJson(doc, payload);
     
     if (!error) {
+      Serial.println("Successfully parsed JSON response");
       // The API returns an array of devices, find ours by hardware_id
+      if (!doc.is<JsonArray>()) {
+        Serial.println("Error: Expected JSON array in response");
+        http.end();
+        return;
+      }
+      
       JsonArray devices = doc.as<JsonArray>();
       bool deviceFound = false;
       
+      Serial.print("Found ");
+      Serial.print(devices.size());
+      Serial.println(" devices in response");
+      
       for (JsonObject device : devices) {
         const char* deviceHwId = device["hardware_id"];
+        Serial.print("Checking device: ");
+        Serial.println(deviceHwId ? deviceHwId : "null");
+        
         if (deviceHwId && strcmp(deviceHwId, hardwareId) == 0) {
+          deviceFound = true;
           bool shouldBeEnabled = device["is_enabled"];
-          if (digitalRead(RELAY_PIN) != (shouldBeEnabled ? HIGH : LOW)) {
+          bool currentState = (digitalRead(RELAY_PIN) == LOW); // LOW means ON in our inverted logic
+          
+          Serial.print("Device match! Current state: ");
+          Serial.print(currentState ? "ON" : "OFF");
+          Serial.print(", Desired state: ");
+          Serial.println(shouldBeEnabled ? "ON" : "OFF");
+          
+          if (currentState != shouldBeEnabled) {
+            Serial.println("Updating relay state...");
             updateRelayState(shouldBeEnabled);
+          } else {
+            Serial.println("No state change needed");
           }
-          return; // Found our device, exit
+          break;
         }
+      }
+      
+      if (!deviceFound) {
+        Serial.println("Device not found in the response");
       }
       Serial.println("Device not found in backend");
     } else {
       Serial.println("Invalid response from server");
     }
+  } else if (httpCode == -1) {
+    Serial.println("Error: Connection failed");
   } else {
     Serial.print("HTTP Error: ");
     Serial.println(httpCode);
+    Serial.print("Error: ");
+    Serial.println(http.errorToString(httpCode).c_str());
   }
+  
+  http.end();  // Make sure to close the connection
+  Serial.println("--- End of status check ---");
 
   
   http.end();
