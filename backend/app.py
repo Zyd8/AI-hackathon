@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 from flask import Flask, request, jsonify, Response
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
@@ -29,16 +30,19 @@ class Room(db.Model):
     live_camera = db.Column(db.String, nullable=False, default='')
     building_id = db.Column(db.Integer, db.ForeignKey('building.id'), nullable=False)
 
+# Device model
 class Device(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    hardware_id = db.Column(db.Integer, nullable=False)
-    name = db.Column(db.String, nullable=False)
-    is_enabled = db.Column(db.Boolean, nullable=False)
-    persons_before_enabled = db.Column(db.Integer, nullable=False)
-    delay_before_enabled = db.Column(db.Integer, nullable=False)
-    persons_before_disabled = db.Column(db.Integer, nullable=False)
-    delay_before_disabled = db.Column(db.Integer, nullable=False)
-    room_id = db.Column(db.Integer, db.ForeignKey('room.id'), nullable=False)
+    hardware_id = db.Column(db.String(64), unique=True, nullable=False)
+    name = db.Column(db.String(128), nullable=False, default="Smart Outlet")
+    is_enabled = db.Column(db.Boolean, nullable=False, default=False)
+    last_seen = db.Column(db.DateTime, nullable=True)
+    ip_address = db.Column(db.String(45), nullable=True)
+    room_id = db.Column(db.Integer, db.ForeignKey('room.id'), nullable=True)
+    persons_before_enabled = db.Column(db.Integer, nullable=True)
+    delay_before_enabled = db.Column(db.Integer, nullable=True)
+    persons_before_disabled = db.Column(db.Integer, nullable=True)
+    delay_before_disabled = db.Column(db.Integer, nullable=True)
 
 db_initialized = False
 
@@ -52,6 +56,51 @@ def initialize_database():
             db.session.add(new_admin)
             db.session.commit()
         db_initialized = True
+
+# Device status check endpoint - used by ESP32 to check its status
+@app.route('/api/device/status', methods=['GET'])
+def get_device_status():
+    hardware_id = request.args.get('hardware_id')
+    if not hardware_id:
+        return jsonify([]), 200  # Return empty array if no hardware_id provided
+    
+    try:
+        # Convert hardware_id to string for comparison
+        hardware_id = str(hardware_id)
+        
+        # Find device by hardware_id
+        device = db.session.execute(
+            db.select(Device).filter_by(hardware_id=hardware_id)
+        ).scalar_one_or_none()
+        
+        if not device:
+            return jsonify([]), 200  # Return empty array if device not found
+            
+        # Update last seen timestamp
+        device.last_seen = datetime.utcnow()
+        
+        # Update IP address if available
+        if request.remote_addr:
+            device.ip_address = request.remote_addr
+            
+        db.session.commit()
+        
+        # Return device information in the expected format
+        return jsonify([{
+            'id': device.id,
+            'hardware_id': device.hardware_id,
+            'name': device.name,
+            'is_enabled': device.is_enabled,
+            'persons_before_enabled': device.persons_before_enabled or 0,
+            'delay_before_enabled': device.delay_before_enabled or 0,
+            'persons_before_disabled': device.persons_before_disabled or 0,
+            'delay_before_disabled': device.delay_before_disabled or 0,
+            'room_id': device.room_id
+        }])
+        
+    except Exception as e:
+        app.logger.error(f"Error in get_device_status: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 # Login route
 @app.route('/api/login', methods=['POST'])
@@ -267,31 +316,46 @@ def add_device(room_id):
     try:
         data = request.get_json()
         
+        # Check if room exists
+        room = db.session.get(Room, room_id)
+        if not room:
+            return jsonify({'success': False, 'message': 'Room not found'}), 404
+        
         # Validate required fields
-        required_fields = ['hardware_id', 'name', 'is_enabled', 
-                         'persons_before_enabled', 'delay_before_enabled',
-                         'persons_before_disabled', 'delay_before_disabled']
-        
+        required_fields = ['hardware_id', 'name']
         for field in required_fields:
-            if field not in data:
-                return jsonify({'success': False, 'message': f'Missing required field: {field}'}), 400
+            if not data.get(field):
+                return jsonify({'success': False, 'message': f'Missing or empty required field: {field}'}), 400
         
-        # Create new device
+        # Check if device with this hardware_id already exists
+        existing_device = db.session.execute(
+            db.select(Device).filter_by(hardware_id=str(data['hardware_id']))
+        ).scalar_one_or_none()
+        if existing_device:
+            return jsonify({
+                'success': False, 
+                'message': 'A device with this hardware ID already exists',
+                'existing_device_id': existing_device.id
+            }), 409
+        
+        # Create new device with default values for optional fields
         new_device = Device(
-            hardware_id=data['hardware_id'],
-            name=data['name'],
-            is_enabled=data['is_enabled'],
-            persons_before_enabled=data['persons_before_enabled'],
-            delay_before_enabled=data['delay_before_enabled'],
-            persons_before_disabled=data['persons_before_disabled'],
-            delay_before_disabled=data['delay_before_disabled'],
-            room_id=room_id
+            hardware_id=str(data['hardware_id']),
+            name=str(data['name']),
+            is_enabled=bool(data.get('is_enabled', False)),
+            persons_before_enabled=int(data.get('persons_before_enabled', 1)) if data.get('persons_before_enabled') is not None else None,
+            delay_before_enabled=int(data.get('delay_before_enabled', 5)) if data.get('delay_before_enabled') is not None else None,
+            persons_before_disabled=int(data.get('persons_before_disabled', 0)) if data.get('persons_before_disabled') is not None else None,
+            delay_before_disabled=int(data.get('delay_before_disabled', 5)) if data.get('delay_before_disabled') is not None else None,
+            room_id=room_id,
+            last_seen=datetime.utcnow()
         )
         
         db.session.add(new_device)
         db.session.commit()
         
-        return jsonify({
+        # Prepare response
+        device_data = {
             'id': new_device.id,
             'hardware_id': new_device.hardware_id,
             'name': new_device.name,
@@ -300,55 +364,109 @@ def add_device(room_id):
             'delay_before_enabled': new_device.delay_before_enabled,
             'persons_before_disabled': new_device.persons_before_disabled,
             'delay_before_disabled': new_device.delay_before_disabled,
-            'room_id': new_device.room_id
+            'room_id': new_device.room_id,
+            'last_seen': new_device.last_seen.isoformat() if new_device.last_seen else None,
+            'ip_address': new_device.ip_address
+        }
+        
+        return jsonify({
+            'success': True,
+            'message': 'Device added successfully',
+            'device': device_data
         }), 201
         
+    except ValueError as ve:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'Invalid data format: {str(ve)}'}), 400
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 500
+        app.logger.error(f"Error adding device: {str(e)}")
+        return jsonify({
+            'success': False, 
+            'message': f'Failed to add device: {str(e)}'
+        }), 500
 
 @app.route('/api/devices/<int:device_id>', methods=['PUT'])
 def update_device(device_id):
     try:
         data = request.get_json()
-        device = Device.query.get(device_id)
+        device = db.session.get(Device, device_id)
         
         if not device:
-            return jsonify({'success': False, 'message': 'Device not found'}), 404
+            return jsonify({
+                'success': False, 
+                'message': 'Device not found'
+            }), 404
         
-        # Update fields if they exist in the request
+        # Check if room exists if room_id is being updated
+        if 'room_id' in data and data['room_id'] is not None:
+            room = db.session.get(Room, data['room_id'])
+            if not room:
+                return jsonify({
+                    'success': False, 
+                    'message': 'Room not found'
+                }), 404
+            device.room_id = data['room_id']
+        
+        # Update basic fields
         if 'hardware_id' in data:
-            device.hardware_id = data['hardware_id']
+            device.hardware_id = str(data['hardware_id'])
         if 'name' in data:
-            device.name = data['name']
+            device.name = str(data['name'])
         if 'is_enabled' in data:
-            device.is_enabled = data['is_enabled']
-        if 'persons_before_enabled' in data:
-            device.persons_before_enabled = data['persons_before_enabled']
-        if 'delay_before_enabled' in data:
-            device.delay_before_enabled = data['delay_before_enabled']
-        if 'persons_before_disabled' in data:
-            device.persons_before_disabled = data['persons_before_disabled']
-        if 'delay_before_disabled' in data:
-            device.delay_before_disabled = data['delay_before_disabled']
+            device.is_enabled = bool(data['is_enabled'])
+        
+        # Update optional fields if they exist in the request
+        optional_fields = [
+            'persons_before_enabled',
+            'delay_before_enabled',
+            'persons_before_disabled',
+            'delay_before_disabled'
+        ]
+        
+        for field in optional_fields:
+            if field in data and data[field] is not None:
+                setattr(device, field, int(data[field]) if data[field] is not None else None)
+        
+        # Update last seen timestamp
+        device.last_seen = datetime.utcnow()
         
         db.session.commit()
         
-        return jsonify({
+        # Prepare the response
+        updated_device = {
             'id': device.id,
             'hardware_id': device.hardware_id,
             'name': device.name,
             'is_enabled': device.is_enabled,
+            'room_id': device.room_id,
             'persons_before_enabled': device.persons_before_enabled,
             'delay_before_enabled': device.delay_before_enabled,
             'persons_before_disabled': device.persons_before_disabled,
             'delay_before_disabled': device.delay_before_disabled,
-            'room_id': device.room_id
+            'last_seen': device.last_seen.isoformat() if device.last_seen else None,
+            'ip_address': device.ip_address
+        }
+        
+        return jsonify({
+            'success': True,
+            'message': 'Device updated successfully',
+            'device': updated_device
         }), 200
         
+    except ValueError as ve:
+        db.session.rollback()
+        return jsonify({
+            'success': False, 
+            'message': f'Invalid data format: {str(ve)}'
+        }), 400
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 500
+        app.logger.error(f"Error updating device: {str(e)}")
+        return jsonify({
+            'success': False, 
+            'message': f'Failed to update device: {str(e)}'
+        }), 500
 
 @app.route('/api/devices/<int:device_id>', methods=['DELETE'])
 def delete_device(device_id):
@@ -409,4 +527,4 @@ import atexit
 atexit.register(camera_service.cleanup)
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=True)

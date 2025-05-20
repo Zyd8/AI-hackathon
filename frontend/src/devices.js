@@ -130,16 +130,42 @@ const DevicesPage = () => {
   // Add a new device
   const addDevice = async () => {
     try {
-      const response = await axios.post(`http://localhost:5000/api/rooms/${roomId}/devices`, {
-        ...newDevice,
-        hardware_id: parseInt(newDevice.hardware_id),
-        persons_before_enabled: parseInt(newDevice.persons_before_enabled),
-        delay_before_enabled: parseInt(newDevice.delay_before_enabled),
-        persons_before_disabled: parseInt(newDevice.persons_before_disabled),
-        delay_before_disabled: parseInt(newDevice.delay_before_disabled)
-      });
+      // First, check if device with this hardware ID exists
+      const checkResponse = await axios.get(`http://localhost:5000/api/device/status?hardware_id=${newDevice.hardware_id}`);
       
-      setDevices([...devices, response.data]);
+      let device;
+      
+      if (checkResponse.data && checkResponse.data.length > 0) {
+        // Device exists, update it
+        const existingDevice = checkResponse.data[0];
+        const updateResponse = await axios.put(`http://localhost:5000/api/devices/${existingDevice.id}`, {
+          ...existingDevice,
+          name: newDevice.name || existingDevice.name,
+          room_id: parseInt(roomId),
+          is_enabled: newDevice.is_enabled,
+          persons_before_enabled: parseInt(newDevice.persons_before_enabled) || 0,
+          delay_before_enabled: parseInt(newDevice.delay_before_enabled) || 0,
+          persons_before_disabled: parseInt(newDevice.persons_before_disabled) || 0,
+          delay_before_disabled: parseInt(newDevice.delay_before_disabled) || 0
+        });
+        device = updateResponse.data.device;
+      } else {
+        // Create new device
+        const response = await axios.post(`http://localhost:5000/api/rooms/${roomId}/devices`, {
+          ...newDevice,
+          hardware_id: newDevice.hardware_id, // Keep as string
+          persons_before_enabled: parseInt(newDevice.persons_before_enabled) || 0,
+          delay_before_enabled: parseInt(newDevice.delay_before_enabled) || 0,
+          persons_before_disabled: parseInt(newDevice.persons_before_disabled) || 0,
+          delay_before_disabled: parseInt(newDevice.delay_before_disabled) || 0
+        });
+        device = response.data;
+      }
+      
+      // Refresh devices list
+      const devicesResponse = await axios.get(`http://localhost:5000/api/rooms/${roomId}/devices`);
+      setDevices(devicesResponse.data);
+      
       setShowAddDeviceModal(false);
       setNewDevice({
         hardware_id: '',
@@ -152,6 +178,7 @@ const DevicesPage = () => {
       });
     } catch (error) {
       console.error('Error adding device:', error);
+      alert('Failed to add device. Please check the hardware ID and try again.');
     }
   };
 
@@ -162,20 +189,26 @@ const DevicesPage = () => {
     try {
       const response = await axios.put(`http://localhost:5000/api/devices/${deviceToEdit.id}`, {
         ...deviceToEdit,
-        hardware_id: parseInt(deviceToEdit.hardware_id),
-        persons_before_enabled: parseInt(deviceToEdit.persons_before_enabled),
-        delay_before_enabled: parseInt(deviceToEdit.delay_before_enabled),
-        persons_before_disabled: parseInt(deviceToEdit.persons_before_disabled),
-        delay_before_disabled: parseInt(deviceToEdit.delay_before_disabled)
+        // Ensure numeric fields are properly formatted
+        hardware_id: String(deviceToEdit.hardware_id),
+        persons_before_enabled: parseInt(deviceToEdit.persons_before_enabled) || 0,
+        delay_before_enabled: parseInt(deviceToEdit.delay_before_enabled) || 0,
+        persons_before_disabled: parseInt(deviceToEdit.persons_before_disabled) || 0,
+        delay_before_disabled: parseInt(deviceToEdit.delay_before_disabled) || 0,
+        // Ensure room_id is included
+        room_id: deviceToEdit.room_id || parseInt(roomId)
       });
       
+      // Update the UI with the response from the backend
       setDevices(devices.map(device => 
-        device.id === deviceToEdit.id ? response.data : device
+        device.id === deviceToEdit.id ? response.data.device : device
       ));
+      
       setShowEditDeviceModal(false);
       setDeviceToEdit(null);
     } catch (error) {
       console.error('Error updating device:', error);
+      alert('Failed to update device. Please try again.');
     }
   };
 
@@ -200,21 +233,32 @@ const DevicesPage = () => {
   // Toggle device status
   const toggleDeviceStatus = async (device) => {
     try {
-      const updatedDevice = { ...device, is_enabled: !device.is_enabled };
+      const newState = !device.is_enabled;
+      
+      // Update the device in the backend
       const response = await axios.put(`http://localhost:5000/api/devices/${device.id}`, {
-        ...updatedDevice,
-        hardware_id: parseInt(updatedDevice.hardware_id),
-        persons_before_enabled: parseInt(updatedDevice.persons_before_enabled),
-        delay_before_enabled: parseInt(updatedDevice.delay_before_enabled),
-        persons_before_disabled: parseInt(updatedDevice.persons_before_disabled),
-        delay_before_disabled: parseInt(updatedDevice.delay_before_disabled)
+        ...device,
+        is_enabled: newState,
+        // Ensure numeric fields are properly formatted
+        hardware_id: String(device.hardware_id),
+        persons_before_enabled: parseInt(device.persons_before_enabled) || 0,
+        delay_before_enabled: parseInt(device.delay_before_enabled) || 0,
+        persons_before_disabled: parseInt(device.persons_before_disabled) || 0,
+        delay_before_disabled: parseInt(device.delay_before_disabled) || 0,
+        // Ensure room_id is included if it exists
+        room_id: device.room_id || null
       });
       
+      // Update the UI with the response from the backend
       setDevices(devices.map(d => 
-        d.id === device.id ? response.data : d
+        d.id === device.id ? response.data.device : d
       ));
+      
+      console.log(`Device ${device.id} toggled to ${newState ? 'ON' : 'OFF'}`);
     } catch (error) {
       console.error('Error toggling device status:', error);
+      // Show error to user
+      alert('Failed to update device. Please try again.');
     }
   };
 
