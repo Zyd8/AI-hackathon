@@ -50,6 +50,20 @@ const DevicesPage = () => {
     return () => { isMounted = false; clearInterval(interval); };
   }, [cameraAvailable, cameraUrl, roomId]);
 
+  // Poll devices state every 2 seconds to update toggles in real time
+  useEffect(() => {
+    if (!roomId) return;
+    let isMounted = true;
+    const interval = setInterval(() => {
+      axios.get(`http://localhost:5000/api/rooms/${roomId}/devices`).then(res => {
+        if (isMounted && Array.isArray(res.data)) {
+          setDevices(res.data);
+        }
+      });
+    }, 2000);
+    return () => { isMounted = false; clearInterval(interval); };
+  }, [roomId]);
+
   // Refresh camera feed only when camera is available and component is mounted
   useEffect(() => {
     if (!cameraAvailable || !cameraUrl) return;
@@ -189,7 +203,8 @@ const DevicesPage = () => {
           persons_before_enabled: parseInt(newDevice.persons_before_enabled) || 0,
           delay_before_enabled: parseInt(newDevice.delay_before_enabled) || 0,
           persons_before_disabled: parseInt(newDevice.persons_before_disabled) || 0,
-          delay_before_disabled: parseInt(newDevice.delay_before_disabled) || 0
+          delay_before_disabled: parseInt(newDevice.delay_before_disabled) || 0,
+          is_manual: !!newDevice.is_manual
         });
         device = updateResponse.data.device;
       } else {
@@ -200,7 +215,8 @@ const DevicesPage = () => {
           persons_before_enabled: parseInt(newDevice.persons_before_enabled) || 0,
           delay_before_enabled: parseInt(newDevice.delay_before_enabled) || 0,
           persons_before_disabled: parseInt(newDevice.persons_before_disabled) || 0,
-          delay_before_disabled: parseInt(newDevice.delay_before_disabled) || 0
+          delay_before_disabled: parseInt(newDevice.delay_before_disabled) || 0,
+          is_manual: !!newDevice.is_manual
         });
         device = response.data;
       }
@@ -239,7 +255,8 @@ const DevicesPage = () => {
         persons_before_disabled: parseInt(deviceToEdit.persons_before_disabled) || 0,
         delay_before_disabled: parseInt(deviceToEdit.delay_before_disabled) || 0,
         // Ensure room_id is included
-        room_id: deviceToEdit.room_id || parseInt(roomId)
+        room_id: deviceToEdit.room_id || parseInt(roomId),
+        is_manual: !!deviceToEdit.is_manual
       });
       
       // Update the UI with the response from the backend
@@ -395,13 +412,28 @@ const DevicesPage = () => {
               </div>
               <div className="device-details">
                 <p><strong>Hardware ID:</strong> {device.hardware_id}</p>
+                <div className="manual-toggle-row">
+                  <label style={{marginRight:8}}>
+                    <input
+                      type="checkbox"
+                      checked={device.is_manual}
+                      readOnly
+                      style={{marginRight:4}}
+                    />
+                    Manual Control
+                  </label>
+                  <span style={{marginLeft:8, color: device.is_manual ? '#22c55e' : '#f59e42'}}>
+                    {device.is_manual ? 'Manual' : 'AI'}
+                  </span>
+                </div>
                 <p className="status-toggle">
                   <strong>Status: </strong>
                   <label className="switch">
                     <input 
                       type="checkbox" 
                       checked={device.is_enabled} 
-                      onChange={() => toggleDeviceStatus(device)}
+                      onChange={() => device.is_manual && toggleDeviceStatus(device)}
+                      disabled={!device.is_manual}
                     />
                     <span className="slider round"></span>
                   </label>
@@ -451,6 +483,17 @@ const DevicesPage = () => {
                     onChange={handleAddInputChange}
                   />
                   Enabled
+                </label>
+              </div>
+              <div className="form-group checkbox-group">
+                <label>
+                  <input
+                    type="checkbox"
+                    name="is_manual"
+                    checked={!!newDevice.is_manual}
+                    onChange={handleAddInputChange}
+                  />
+                  Manual Control
                 </label>
               </div>
               <div className="form-group">
@@ -534,6 +577,17 @@ const DevicesPage = () => {
                     onChange={handleEditInputChange}
                   />
                   Enabled
+                </label>
+              </div>
+              <div className="form-group checkbox-group">
+                <label>
+                  <input
+                    type="checkbox"
+                    name="is_manual"
+                    checked={!!deviceToEdit.is_manual}
+                    onChange={handleEditInputChange}
+                  />
+                  Manual Control
                 </label>
               </div>
               <div className="form-group">

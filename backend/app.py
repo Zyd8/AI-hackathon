@@ -43,6 +43,7 @@ class Device(db.Model):
     delay_before_enabled = db.Column(db.Integer, nullable=True)
     persons_before_disabled = db.Column(db.Integer, nullable=True)
     delay_before_disabled = db.Column(db.Integer, nullable=True)
+    is_manual = db.Column(db.Boolean, nullable=False, default=False)
 
 db_initialized = False
 
@@ -95,7 +96,8 @@ def get_device_status():
             'delay_before_enabled': device.delay_before_enabled or 0,
             'persons_before_disabled': device.persons_before_disabled or 0,
             'delay_before_disabled': device.delay_before_disabled or 0,
-            'room_id': device.room_id
+            'room_id': device.room_id,
+            'is_manual': device.is_manual
         }])
         
     except Exception as e:
@@ -304,7 +306,8 @@ def get_devices(room_id):
             'delay_before_enabled': d.delay_before_enabled,
             'persons_before_disabled': d.persons_before_disabled,
             'delay_before_disabled': d.delay_before_disabled,
-            'room_id': d.room_id
+            'room_id': d.room_id,
+            'is_manual': d.is_manual
         } for d in devices]
 
         return jsonify(devices_list), 200
@@ -348,7 +351,8 @@ def add_device(room_id):
             persons_before_disabled=int(data.get('persons_before_disabled', 0)) if data.get('persons_before_disabled') is not None else None,
             delay_before_disabled=int(data.get('delay_before_disabled', 5)) if data.get('delay_before_disabled') is not None else None,
             room_id=room_id,
-            last_seen=datetime.utcnow()
+            last_seen=datetime.utcnow(),
+            is_manual=bool(data.get('is_manual', False))
         )
         
         db.session.add(new_device)
@@ -366,7 +370,8 @@ def add_device(room_id):
             'delay_before_disabled': new_device.delay_before_disabled,
             'room_id': new_device.room_id,
             'last_seen': new_device.last_seen.isoformat() if new_device.last_seen else None,
-            'ip_address': new_device.ip_address
+            'ip_address': new_device.ip_address,
+            'is_manual': new_device.is_manual
         }
         
         return jsonify({
@@ -415,6 +420,8 @@ def update_device(device_id):
             device.name = str(data['name'])
         if 'is_enabled' in data:
             device.is_enabled = bool(data['is_enabled'])
+        if 'is_manual' in data:
+            device.is_manual = bool(data['is_manual'])
         
         # Update optional fields if they exist in the request
         optional_fields = [
@@ -445,7 +452,8 @@ def update_device(device_id):
             'persons_before_disabled': device.persons_before_disabled,
             'delay_before_disabled': device.delay_before_disabled,
             'last_seen': device.last_seen.isoformat() if device.last_seen else None,
-            'ip_address': device.ip_address
+            'ip_address': device.ip_address,
+            'is_manual': device.is_manual
         }
         
         return jsonify({
@@ -538,6 +546,49 @@ def get_person_count(camera_id):
 # Add cleanup on app exit
 import atexit
 atexit.register(camera_service.cleanup)
+
+import threading
+import time
+
+def ai_device_scheduler():
+    # Track state for delay logic
+    last_enable_time = {}
+    last_disable_time = {}
+    while True:
+        with app.app_context():
+            devices = Device.query.filter_by(is_manual=False).all()
+            for device in devices:
+                room_id = str(device.room_id)
+                person_count = camera_service.get_person_count(room_id)
+                now = time.time()
+                # Enable logic
+                if person_count is not None and device.persons_before_enabled is not None and device.delay_before_enabled is not None:
+                    if person_count >= device.persons_before_enabled:
+                        # Start/continue enable timer
+                        if device.id not in last_enable_time:
+                            last_enable_time[device.id] = now
+                        if now - last_enable_time[device.id] >= device.delay_before_enabled:
+                            if not device.is_enabled:
+                                device.is_enabled = True
+                                db.session.commit()
+                    else:
+                        last_enable_time[device.id] = now
+                # Disable logic
+                if person_count is not None and device.persons_before_disabled is not None and device.delay_before_disabled is not None:
+                    if person_count <= device.persons_before_disabled:
+                        # Start/continue disable timer
+                        if device.id not in last_disable_time:
+                            last_disable_time[device.id] = now
+                        if now - last_disable_time[device.id] >= device.delay_before_disabled:
+                            if device.is_enabled:
+                                device.is_enabled = False
+                                db.session.commit()
+                    else:
+                        last_disable_time[device.id] = now
+        time.sleep(2)
+
+# Start the AI device automation thread
+threading.Thread(target=ai_device_scheduler, daemon=True).start()
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
