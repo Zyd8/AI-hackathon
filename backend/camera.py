@@ -17,7 +17,8 @@ class CameraService:
         return cls._instance
     
     def _initialize(self):
-        self.cameras: Dict[str, Tuple[cv2.VideoCapture, np.ndarray, float]] = {}
+        # Store (cv2.VideoCapture, current_frame, last_update_time, person_count)
+        self.cameras: Dict[str, Tuple[cv2.VideoCapture, np.ndarray, float, int]] = {}
         self.model = YOLO("yolo11s.pt")
         self.lock = threading.Lock()
         self.running = True
@@ -48,8 +49,8 @@ class CameraService:
                 print(f"Failed to open camera {camera_id} with source: {source}")
                 return False
                 
-            # Store camera capture, current frame, and last update time
-            self.cameras[camera_id] = (cap, None, time.time())
+            # Store camera capture, current frame, last update time, and initial person count
+            self.cameras[camera_id] = (cap, None, time.time(), 0)
             return True
     
     def remove_camera(self, camera_id: str):
@@ -66,7 +67,7 @@ class CameraService:
             if camera_id not in self.cameras:
                 return None
                 
-            _, frame, _ = self.cameras[camera_id]
+            _, frame, _, _ = self.cameras[camera_id]
             if frame is None:
                 return None
                 
@@ -78,25 +79,42 @@ class CameraService:
         """Background thread to update camera frames."""
         while self.running:
             with self.lock:
-                for camera_id, (cap, _, _) in list(self.cameras.items()):
+                for camera_id, (cap, _, _, _) in list(self.cameras.items()):
                     ret, frame = cap.read()
+                    person_count = 0
                     if ret:
                         # Run object detection
                         results = self.model.predict(source=frame, conf=0.5, verbose=False)
                         if len(results) > 0 and len(results[0].boxes) > 0:
-                            frame = results[0].plot()  # Draw detections on frame
-                        
-                        # Update frame and timestamp
-                        self.cameras[camera_id] = (cap, frame, time.time())
+                            boxes = results[0].boxes
+                            # Count persons (YOLO class 0 is 'person')
+                            for box in boxes:
+                                if hasattr(box, 'cls'):
+                                    cls_id = int(box.cls[0]) if hasattr(box.cls, '__getitem__') else int(box.cls)
+                                    if cls_id == 0:
+                                        person_count += 1
+                            # Overlay person count on frame
+                            frame = results[0].plot()
+                            cv2.putText(frame, f'Persons: {person_count}', (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0), 2, cv2.LINE_AA)
+                        # Update frame, timestamp, and person_count
+                        self.cameras[camera_id] = (cap, frame, time.time(), person_count)
                     else:
                         print(f"Failed to read from camera {camera_id}")
                         # Reconnect after a short delay
                         cap.release()
                         cap = cv2.VideoCapture(camera_id)
-                        self.cameras[camera_id] = (cap, None, time.time())
+                        self.cameras[camera_id] = (cap, None, time.time(), 0)
             
             time.sleep(0.033)  # ~30 FPS
     
+    def get_person_count(self, camera_id: str) -> Optional[int]:
+        """Get the number of persons detected in the latest frame."""
+        with self.lock:
+            if camera_id not in self.cameras:
+                return None
+            _, _, _, person_count = self.cameras[camera_id]
+            return person_count
+
     def cleanup(self):
         """Clean up resources."""
         self.running = False

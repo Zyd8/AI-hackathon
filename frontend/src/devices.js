@@ -15,6 +15,9 @@ const Sidebar = () => (
 );
 
 const DevicesPage = () => {
+  // Person count state
+  const [personCount, setPersonCount] = useState(null);
+  const [personLastUpdate, setPersonLastUpdate] = useState(null);
   const { roomId } = useParams();
   const navigate = useNavigate();
   const [devices, setDevices] = useState([]);
@@ -28,6 +31,25 @@ const DevicesPage = () => {
   // Add a timestamp to force image refresh
   const [timestamp, setTimestamp] = useState(Date.now());
   
+  // Poll person count when camera is available
+  useEffect(() => {
+    if (!cameraAvailable || !cameraUrl || !roomId) return;
+    let isMounted = true;
+    const interval = setInterval(() => {
+      axios.get(`http://localhost:5000/api/person_count/${roomId}`)
+        .then(res => {
+          if (isMounted && res.data && !res.data.error) {
+            setPersonCount(res.data.person_count);
+            setPersonLastUpdate(res.data.last_update);
+          }
+        })
+        .catch(() => {
+          if (isMounted) setPersonCount(null);
+        });
+    }, 1000);
+    return () => { isMounted = false; clearInterval(interval); };
+  }, [cameraAvailable, cameraUrl, roomId]);
+
   // Refresh camera feed only when camera is available and component is mounted
   useEffect(() => {
     if (!cameraAvailable || !cameraUrl) return;
@@ -307,6 +329,11 @@ const DevicesPage = () => {
         
         {/* Camera Feed Section */}
         <div className="camera-feed-container">
+          {cameraAvailable && (
+            <div style={{marginBottom: 8, fontWeight: 'bold', fontSize: 18, color: '#2563eb'}}>
+              Persons Detected: {personCount !== null ? personCount : 'Loading...'}
+            </div>
+          )}
           {cameraLoading ? (
             <div className="camera-loading">Loading camera feed...</div>
           ) : cameraAvailable ? (

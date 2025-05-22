@@ -522,6 +522,19 @@ def camera_status(room_id):
         'camera_url': room.live_camera
     })
 
+# Person count API endpoint
+@app.route('/api/person_count/<camera_id>', methods=['GET'])
+def get_person_count(camera_id):
+    with camera_service.lock:
+        if camera_id not in camera_service.cameras:
+            return jsonify({"error": "Camera not found"}), 404
+        _, _, last_update, person_count = camera_service.cameras[camera_id]
+        return jsonify({
+            "camera_id": camera_id,
+            "person_count": person_count,
+            "last_update": last_update
+        })
+
 # Add cleanup on app exit
 import atexit
 atexit.register(camera_service.cleanup)
