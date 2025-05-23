@@ -2,14 +2,40 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import './App.css';
-import { FaHome, FaBuilding, FaDoorOpen } from 'react-icons/fa';
+import { FaHome, FaBuilding, FaDoorOpen, FaTachometerAlt, FaSignOutAlt } from 'react-icons/fa';
 
-const Sidebar = () => (
+const Sidebar = ({ onLogout }) => (
   <div className="sidebar">
-    <h2>UEcoManage</h2>
-    <a href="/dashboard" className="sidebar-link"><FaHome style={{marginRight:8}}/>Dashboard</a>
-    <a href="/building" className="sidebar-link active"><FaBuilding style={{marginRight:8}}/>Building</a>
-    <a href="/room" className="sidebar-link"><FaDoorOpen style={{marginRight:8}}/>Room</a>
+    <div className="sidebar-header">
+      <h2>Dashboard</h2>
+    </div>
+    <nav>
+      <ul>
+        <li>
+          <a href="/dashboard">
+            <FaTachometerAlt /> Dashboard
+          </a>
+        </li>
+        <li>
+          <a href="/building">
+            <FaBuilding /> Buildings
+          </a>
+        </li>
+        <li>
+          <a href="/rooms">
+            <FaDoorOpen /> Rooms
+          </a>
+        </li>
+        <li>
+          <a href="#" onClick={(e) => {
+            e.preventDefault();
+            onLogout();
+          }}>
+            <FaSignOutAlt /> Logout
+          </a>
+        </li>
+      </ul>
+    </nav>
   </div>
 );
 
@@ -40,7 +66,7 @@ const BuildingNavbar = ({ buildings, onSelectBuilding, activeBuilding, onDeleteB
   </nav>
 );
 
-const BuildingNavigation = () => {
+const BuildingNavigation = ({ onLogout }) => {
   const [buildings, setBuildings] = useState([]);
   const [rooms, setRooms] = useState([]);
   const [selectedBuilding, setSelectedBuilding] = useState(null);
@@ -287,7 +313,7 @@ const BuildingNavigation = () => {
   
   return (
     <div style={{display:'flex',minHeight:'100vh'}}>
-      <Sidebar />
+      <Sidebar onLogout={onLogout} />
       <div className="main">
         <header>
           <h1>UEcoManage Admin</h1>

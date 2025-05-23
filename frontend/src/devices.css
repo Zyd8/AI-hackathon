@@ -1,0 +1,240 @@
+/* Devices page specific styles */
+.devices-container {
+  display: flex;
+  min-height: 100vh;
+}
+
+.devices-content {
+  flex: 1;
+  padding: 20px;
+}
+
+.devices-header {
+  margin-bottom: 20px;
+}
+
+.devices-header h1 {
+  margin: 0;
+  color: #1e293b;
+}
+
+.devices-header p {
+  color: #64748b;
+  margin-top: 8px;
+}
+
+/* Device cards grid */
+.devices-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 20px;
+  margin-top: 20px;
+}
+
+.device-card {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.device-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.device-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.device-header h3 {
+  margin: 0;
+  color: #1e293b;
+}
+
+.device-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.device-actions button {
+  padding: 6px 12px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s;
+}
+
+.edit-button {
+  background-color: #3b82f6;
+  color: white;
+}
+
+.edit-button:hover {
+  background-color: #2563eb;
+}
+
+.delete-button {
+  background-color: #ef4444;
+  color: white;
+}
+
+.delete-button:hover {
+  background-color: #dc2626;
+}
+
+.device-details {
+  color: #475569;
+}
+
+.device-details p {
+  margin: 8px 0;
+  font-size: 14px;
+}
+
+.device-details strong {
+  color: #1e293b;
+  margin-right: 5px;
+}
+
+/* Camera feed styles */
+.camera-feed-container {
+  width: 100%;
+  margin: 20px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.camera-feed {
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+  position: relative;
+  background: #1e293b;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.camera-feed img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.camera-info {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 10px;
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.camera-status {
+  background-color: #ef4444;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.camera-status.active {
+  background-color: #10b981;
+}
+
+.camera-url {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 12px;
+  font-family: monospace;
+  max-width: 70%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.camera-loading,
+.camera-unavailable {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+  padding: 40px 20px;
+  color: #94a3b8;
+  text-align: center;
+  background-color: #1e293b;
+  border-radius: 8px;
+}
+
+.camera-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  opacity: 0.5;
+}
+
+.retry-button {
+  margin-top: 16px;
+  padding: 8px 16px;
+  background-color: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s;
+}
+
+.retry-button:hover {
+  background-color: #2563eb;
+}
+
+.error-message {
+  color: #f87171;
+  margin-top: 8px;
+  font-size: 14px;
+}
+
+/* Manual toggle styles */
+.manual-toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.manual-toggle-row label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .devices-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .camera-feed {
+    padding-top: 75%; /* 4:3 Aspect Ratio on mobile */
+  }
+  
+  .camera-url {
+    max-width: 60%;
+  }
+} 
