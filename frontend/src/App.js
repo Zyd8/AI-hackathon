@@ -1,35 +1,21 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import BuildingNavigation from './building';
 import DevicesPage from './devices';
 import AdminLogin from './admin-login';
 
 function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(() => {
-    // Initialize from localStorage
-    return localStorage.getItem('isAuthenticated') === 'true';
-  });
-
-  // Update localStorage when authentication state changes
-  useEffect(() => {
-    localStorage.setItem('isAuthenticated', isAuthenticated);
-  }, [isAuthenticated]);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   // Handle successful login
   const handleLogin = () => {
     setIsAuthenticated(true);
   };
 
-  // Handle logout
-  const handleLogout = () => {
-    setIsAuthenticated(false);
-    localStorage.removeItem('isAuthenticated');
-  };
-
   // Protected route component
   const ProtectedRoute = ({ element: Element, ...rest }) => {
     return isAuthenticated ? (
-      <Element onLogout={handleLogout} {...rest} />
+      <Element {...rest} />
     ) : (
       <Navigate to="/admin-login" replace />
     );

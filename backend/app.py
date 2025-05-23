@@ -590,39 +590,5 @@ def ai_device_scheduler():
 # Start the AI device automation thread
 threading.Thread(target=ai_device_scheduler, daemon=True).start()
 
-@app.route('/api/buildings/<int:building_id>', methods=['DELETE'])
-def delete_building(building_id):
-    try:
-        building = Building.query.get(building_id)
-        if not building:
-            return jsonify({'success': False, 'message': 'Building not found'}), 404
-        
-        # Get all rooms in the building
-        rooms = Room.query.filter_by(building_id=building_id).all()
-        
-        # Delete all devices in each room
-        for room in rooms:
-            Device.query.filter_by(room_id=room.id).delete()
-        
-        # Delete all rooms in the building
-        Room.query.filter_by(building_id=building_id).delete()
-        
-        # Finally delete the building
-        db.session.delete(building)
-        db.session.commit()
-        
-        return jsonify({
-            'success': True,
-            'message': 'Building and all associated rooms and devices deleted successfully'
-        }), 200
-        
-    except Exception as e:
-        db.session.rollback()
-        app.logger.error(f"Error deleting building: {e}")
-        return jsonify({
-            'success': False,
-            'message': 'Failed to delete building. Please try again.'
-        }), 500
-
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
