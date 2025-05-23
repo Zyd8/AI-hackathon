@@ -9,6 +9,7 @@ const Sidebar = () => (
     <h2>UEcoManage</h2>
     <a href="/dashboard" className="sidebar-link"><FaHome style={{marginRight:8}}/>Dashboard</a>
     <a href="/building" className="sidebar-link active"><FaBuilding style={{marginRight:8}}/>Building</a>
+    <a href="/room" className="sidebar-link"><FaDoorOpen style={{marginRight:8}}/>Room</a>
   </div>
 );
 
