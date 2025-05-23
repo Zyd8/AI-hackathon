@@ -160,43 +160,69 @@ def add_building():
         db.session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 500
 
-@app.route('/api/buildings/<int:building_id>', methods=['PUT'])
-def update_building(building_id):
-    try:
-        data = request.get_json()
-        if not data:
-            return jsonify({'error': 'Invalid JSON'}), 400
+@app.route('/api/buildings/<int:building_id>', methods=['PUT', 'DELETE'])
+def handle_building(building_id):
+    if request.method == 'PUT':
+        try:
+            data = request.get_json()
+            if not data:
+                return jsonify({'error': 'Invalid JSON'}), 400
 
-        name = data.get('name')
-        description = data.get('description')
+            name = data.get('name')
+            description = data.get('description')
 
-        if not name or not description:
-            return jsonify({'error': 'Name and description are required'}), 400
+            if not name or not description:
+                return jsonify({'error': 'Name and description are required'}), 400
 
-        building = Building.query.get(building_id)
-        if not building:
-            return jsonify({'error': 'Building not found'}), 404
+            building = Building.query.get(building_id)
+            if not building:
+                return jsonify({'error': 'Building not found'}), 404
 
-        # Update building fields
-        building.name = name
-        building.description = description
-        db.session.commit()
+            # Update building fields
+            building.name = name
+            building.description = description
+            db.session.commit()
 
-        return jsonify({
-            'success': True,
-            'message': 'Building updated successfully',
-            'building': {
-                'id': building.id,
-                'name': building.name,
-                'description': building.description
-            }
-        }), 200
+            return jsonify({
+                'success': True,
+                'message': 'Building updated successfully',
+                'building': {
+                    'id': building.id,
+                    'name': building.name,
+                    'description': building.description
+                }
+            }), 200
 
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 500
-
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'success': False, 'message': str(e)}), 500
     
+    elif request.method == 'DELETE':
+        try:
+            building = Building.query.get(building_id)
+            if not building:
+                return jsonify({'success': False, 'message': 'Building not found'}), 404
+            
+            # First delete all rooms in the building
+            Room.query.filter_by(building_id=building_id).delete()
+            
+            # Then delete the building
+            db.session.delete(building)
+            db.session.commit()
+            
+            return jsonify({
+                'success': True,
+                'message': 'Building and all associated rooms deleted successfully'
+            }), 200
+            
+        except Exception as e:
+            db.session.rollback()
+            app.logger.error(f"Error deleting building: {e}")
+            return jsonify({
+                'success': False,
+                'message': 'Failed to delete building. Please try again.'
+            }), 500
+
 @app.route('/api/buildings/<int:building_id>/rooms', methods=['GET'])
 def get_rooms(building_id):
     try:
