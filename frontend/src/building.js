@@ -1,593 +1,1045 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
-import './App.css';
-import { FaHome, FaBuilding, FaDoorOpen } from 'react-icons/fa';
+import { useState, useEffect } from "react"
+import { useNavigate } from "react-router-dom"
+import axios from "axios"
+import {
+  FaHome,
+  FaBuilding,
+  FaDoorOpen,
+  FaPlus,
+  FaEdit,
+  FaTrash,
+  FaSearch,
+  FaWifi,
+  FaPencilAlt,
+  FaChartBar,
+  FaBolt,
+  FaDollarSign,
+  FaLeaf,
+  FaArrowDown,
+  FaArrowUp,
+} from "react-icons/fa"
+import "./building.css"
 
-const Sidebar = () => (
+const Sidebar = ({ activeTab, setActiveTab }) => (
   <div className="sidebar">
-    <h2>UEcoManage</h2>
-    <a href="/dashboard" className="sidebar-link"><FaHome style={{marginRight:8}}/>Dashboard</a>
-    <a href="/building" className="sidebar-link active"><FaBuilding style={{marginRight:8}}/>Building</a>
-    <a href="/room" className="sidebar-link"><FaDoorOpen style={{marginRight:8}}/>Room</a>
-  </div>
-);
+    <div className="sidebar-header">
+      <FaBolt className="sidebar-logo" />
+      <h1 className="sidebar-title">EcoVolt</h1>
+    </div>
 
-const BuildingNavbar = ({ buildings, onSelectBuilding, activeBuilding, onDeleteBuilding }) => (
-  <nav className="building-navbar">
+    <nav className="sidebar-nav">
+      <button
+        className={`nav-button ${activeTab === "dashboard" ? "nav-button-active" : ""}`}
+        onClick={() => setActiveTab("dashboard")}
+      >
+        <FaHome className="nav-icon" />
+        Dashboard
+      </button>
+      <button
+        className={`nav-button ${activeTab === "buildings" ? "nav-button-active" : ""}`}
+        onClick={() => setActiveTab("buildings")}
+      >
+        <FaBuilding className="nav-icon" />
+        Buildings
+      </button>
+      <button
+        className={`nav-button ${activeTab === "rooms" ? "nav-button-active" : ""}`}
+        onClick={() => setActiveTab("rooms")}
+      >
+        <FaDoorOpen className="nav-icon" />
+        Rooms
+      </button>
+      <button
+        className={`nav-button ${activeTab === "analytics" ? "nav-button-active" : ""}`}
+        onClick={() => setActiveTab("analytics")}
+      >
+        <FaChartBar className="nav-icon" />
+        Analytics
+      </button>
+    </nav>
+  </div>
+)
+
+const BuildingNavbar = ({ buildings, onSelectBuilding, activeBuilding, fromBuildingsPage, setActiveTab }) => (
+  <div className="building-navbar">
     {buildings.map((building) => (
       <div key={building.id} className="building-nav-item">
         <button
-          className={activeBuilding?.id === building.id ? "active" : ""}
-          onClick={() => onSelectBuilding(building)}
+          className={`building-button ${!fromBuildingsPage && activeBuilding?.id === building.id ? "building-button-active" : ""}`}
+          onClick={() => {
+            onSelectBuilding(building)
+            if (fromBuildingsPage && setActiveTab) {
+              setActiveTab("rooms")
+            }
+          }}
         >
           {building.name}
         </button>
-        <button 
-          className="delete-building-btn"
-          onClick={(e) => {
-            e.stopPropagation();
-            if (window.confirm(`Are you sure you want to delete ${building.name}? This will also delete all rooms and devices in it.`)) {
-              onDeleteBuilding(building.id);
-            }
-          }}
-          title="Delete building"
-        >
-          ×
-        </button>
       </div>
     ))}
-  </nav>
-);
+  </div>
+)
 
 const BuildingNavigation = () => {
-  const [buildings, setBuildings] = useState([]);
-  const [rooms, setRooms] = useState([]);
-  const [selectedBuilding, setSelectedBuilding] = useState(null);
-  const [devices, setDevices] = useState([]);
-  const [selectedRoom, setSelectedRoom] = useState(null);
+  const [activeTab, setActiveTab] = useState("buildings")
+  const [buildings, setBuildings] = useState([])
+  const [rooms, setRooms] = useState([])
+  const [selectedBuilding, setSelectedBuilding] = useState(null)
+  const [devices, setDevices] = useState([])
+  const [selectedRoom, setSelectedRoom] = useState(null)
 
   // Modal states
-  const [showDevicesModal, setShowDevicesModal] = useState(false);
-  const [showAddBuildingModal, setShowAddBuildingModal] = useState(false);
-  const [showAddRoomModal, setShowAddRoomModal] = useState(false);
-  const [showEditRoomModal, setShowEditRoomModal] = useState(false);
+  const [showDevicesModal, setShowDevicesModal] = useState(false)
+  const [showAddBuildingModal, setShowAddBuildingModal] = useState(false)
+  const [showAddRoomModal, setShowAddRoomModal] = useState(false)
+  const [showEditRoomModal, setShowEditRoomModal] = useState(false)
+  const [showEditBuildingModal, setShowEditBuildingModal] = useState(false)
 
   // Add building state
-  const [newBuilding, setNewBuilding] = useState({ name: '', description: '' });
+  const [newBuilding, setNewBuilding] = useState({ name: "", description: "" })
 
   // Add room state
-  const [newRoomName, setNewRoomName] = useState('');
-  const [newRoomBuildingId, setNewRoomBuildingId] = useState('');
-  const [newRoomCamera, setNewRoomCamera] = useState('');
+  const [newRoomName, setNewRoomName] = useState("")
+  const [newRoomBuildingId, setNewRoomBuildingId] = useState("")
+  const [newRoomCamera, setNewRoomCamera] = useState("")
 
   // Edit room state
-  const [roomToEditId, setRoomToEditId] = useState(null);
-  const [editRoomName, setEditRoomName] = useState('');
-  const [editRoomCamera, setEditRoomCamera] = useState('');
-  // Edit builoding
-  const [showEditBuildingModal, setShowEditBuildingModal] = useState(false);
-  const [buildingToEdit, setBuildingToEdit] = useState(null);
-  const [editBuildingName, setEditBuildingName] = useState('');
-  const [editBuildingDescription, setEditBuildingDescription] = useState('');
+  const [roomToEditId, setRoomToEditId] = useState(null)
+  const [editRoomName, setEditRoomName] = useState("")
+  const [editRoomCamera, setEditRoomCamera] = useState("")
+
+  // Edit building state
+  const [buildingToEdit, setBuildingToEdit] = useState(null)
+  const [editBuildingName, setEditBuildingName] = useState("")
+  const [editBuildingDescription, setEditBuildingDescription] = useState("")
 
   // State to manage the list of rooms and the selected sort option
-  const [sortOption, setSortOption] = useState('az');
-  const [searchTerm, setSearchTerm] = useState('');
+  const [sortOption, setSortOption] = useState("az")
+  const [searchTerm, setSearchTerm] = useState("")
+  const [buildingSearchTerm, setBuildingSearchTerm] = useState("")
+  const [buildingSortOption, setBuildingSortOption] = useState("az")
 
+  // Mock energy data for dashboard
+  const energyData = {
+    totalConsumption: 3230,
+    monthlySavings: 1240,
+    efficiency: 87,
+    carbonReduction: 2.4,
+  }
 
   // Fetch buildings from API
   const fetchBuildings = () => {
-    axios.get('http://localhost:5000/api/buildings')
+    axios
+      .get("http://localhost:5000/api/buildings")
       .then((response) => {
-        setBuildings(response.data);
+        setBuildings(response.data)
       })
       .catch((error) => {
-        console.error('Error fetching buildings:', error);
-      });
-  };
+        console.error("Error fetching buildings:", error)
+      })
+  }
 
   useEffect(() => {
-    fetchBuildings();
-  }, []);
+    fetchBuildings()
+  }, [])
 
   // When buildings load, set selected building and fetch its rooms
   useEffect(() => {
-    if (buildings.length > 0) {
-      setSelectedBuilding(buildings[0]);
-      fetchRooms(buildings[0]);
+    if (buildings.length > 0 && !selectedBuilding) {
+      setSelectedBuilding(buildings[0])
+      fetchRooms(buildings[0])
     }
-  }, [buildings]);
+  }, [buildings])
 
   // Fetch rooms for a building
   const fetchRooms = (building) => {
-    axios.get(`http://localhost:5000/api/buildings/${building.id}/rooms`)
+    axios
+      .get(`http://localhost:5000/api/buildings/${building.id}/rooms`)
       .then((response) => {
-        setRooms(response.data);
-        setSelectedBuilding(building);
+        // Get device counts for each room
+        const roomsWithDeviceCounts = response.data
+
+        // Create an array of promises to fetch device counts
+        const deviceCountPromises = roomsWithDeviceCounts.map((room) =>
+          axios
+            .get(`http://localhost:5000/api/rooms/${room.id}/devices`)
+            .then((devicesResponse) => ({
+              ...room,
+              devices_count: devicesResponse.data.length,
+            }))
+            .catch((error) => {
+              console.error(`Error fetching devices for room ${room.id}:`, error)
+              return { ...room, devices_count: 0 }
+            }),
+        )
+
+        // Wait for all device count requests to complete
+        Promise.all(deviceCountPromises).then((roomsWithCounts) => {
+          setRooms(roomsWithCounts)
+          setSelectedBuilding(building)
+        })
       })
       .catch((error) => {
-        console.error('Error fetching rooms:', error);
-      });
-  };
+        console.error("Error fetching rooms:", error)
+      })
+  }
 
   // Add a new building
   const addBuilding = () => {
     if (!newBuilding.name.trim()) {
-      alert('Building name is required');
-      return;
+      alert("Building name is required")
+      return
     }
 
-    axios.post('http://localhost:5000/api/buildings', newBuilding)
+    axios
+      .post("http://localhost:5000/api/buildings", newBuilding)
       .then(() => {
-        fetchBuildings(); // Refresh buildings from backend
-        setShowAddBuildingModal(false);
-        setNewBuilding({ name: '', description: '' });
+        fetchBuildings()
+        setShowAddBuildingModal(false)
+        setNewBuilding({ name: "", description: "" })
       })
       .catch((error) => {
-        console.error('Error adding building:', error);
-      });
-  };
+        console.error("Error adding building:", error)
+      })
+  }
 
   // Add a new room
   const addRoom = () => {
     if (!newRoomBuildingId) {
-      alert('Please select a building for the new room');
-      return;
+      alert("Please select a building for the new room")
+      return
     }
     if (!newRoomName.trim()) {
-      alert('Room name is required');
-      return;
+      alert("Room name is required")
+      return
     }
 
-    axios.post(`http://localhost:5000/api/buildings/${newRoomBuildingId}/rooms`, {
-      name: newRoomName,
-      live_camera: newRoomCamera,
-    })
+    axios
+      .post(`http://localhost:5000/api/buildings/${newRoomBuildingId}/rooms`, {
+        name: newRoomName,
+        live_camera: newRoomCamera,
+      })
       .then(() => {
-        const building = buildings.find(b => b.id === newRoomBuildingId);
+        const building = buildings.find((b) => b.id === newRoomBuildingId)
         if (building) {
-          fetchRooms(building);
+          fetchRooms(building)
         }
-        setNewRoomName('');
-        setNewRoomCamera('');
-        setNewRoomBuildingId('');
-        setShowAddRoomModal(false);
+        setNewRoomName("")
+        setNewRoomCamera("")
+        setNewRoomBuildingId("")
+        setShowAddRoomModal(false)
       })
       .catch((error) => {
-        console.error('Error adding room:', error);
-      });
-  };
+        console.error("Error adding room:", error)
+      })
+  }
 
   // Update building info
   const handleUpdateBuilding = () => {
     if (!buildingToEdit) {
-      alert('Please select a building to edit');
-      return;
+      alert("Please select a building to edit")
+      return
     }
     if (!editBuildingName.trim()) {
-      alert('Building name cannot be empty');
-      return;
+      alert("Building name cannot be empty")
+      return
     }
 
-    
-    axios.put(`http://localhost:5000/api/buildings/${buildingToEdit.id}`, {
-      name: editBuildingName,
-      description: editBuildingDescription,
-    })
+    axios
+      .put(`http://localhost:5000/api/buildings/${buildingToEdit.id}`, {
+        name: editBuildingName,
+        description: editBuildingDescription,
+      })
       .then(() => {
-        fetchBuildings(); // Refresh the buildings list
-        setShowEditBuildingModal(false);
-        setBuildingToEdit(null);
-        setEditBuildingName('');
-        setEditBuildingDescription('');
+        fetchBuildings()
+        setShowEditBuildingModal(false)
+        setBuildingToEdit(null)
+        setEditBuildingName("")
+        setEditBuildingDescription("")
       })
       .catch((error) => {
-        console.error('Error updating building:', error);
-      });
-  };
+        console.error("Error updating building:", error)
+      })
+  }
+
   // Update room info
   const handleUpdateRoom = () => {
     if (!roomToEditId) {
-      alert('Please select a room to edit');
-      return;
+      alert("Please select a room to edit")
+      return
     }
     if (!editRoomName.trim()) {
-      alert('Room name cannot be empty');
-      return;
+      alert("Room name cannot be empty")
+      return
     }
 
-    axios.put(`http://localhost:5000/api/rooms/${roomToEditId}`, {
-      name: editRoomName,
-      live_camera: editRoomCamera,
-    })
+    axios
+      .put(`http://localhost:5000/api/rooms/${roomToEditId}`, {
+        name: editRoomName,
+        live_camera: editRoomCamera,
+      })
       .then(() => {
         if (selectedBuilding) {
-          fetchRooms(selectedBuilding);
+          fetchRooms(selectedBuilding)
         }
-        setShowEditRoomModal(false);
-        setRoomToEditId(null);
-        setEditRoomName('');
-        setEditRoomCamera('');
+        setShowEditRoomModal(false)
+        setRoomToEditId(null)
+        setEditRoomName("")
+        setEditRoomCamera("")
       })
-      .catch(err => {
-        console.error('Failed to update room', err);
-      });
-  };
+      .catch((err) => {
+        console.error("Failed to update room", err)
+      })
+  }
 
   // Function to handle sorting
   const sortRooms = (option) => {
-    let sortedRooms = [...rooms];
-    if (option === 'az') {
-      sortedRooms.sort(); // Sort alphabetically A–Z
-    } else if (option === 'za') {
-      sortedRooms.sort().reverse(); // Sort alphabetically Z–A
+    const sortedRooms = [...rooms]
+    if (option === "az") {
+      sortedRooms.sort((a, b) => a.name.localeCompare(b.name))
+    } else if (option === "za") {
+      sortedRooms.sort((a, b) => b.name.localeCompare(a.name))
     }
-    setRooms(sortedRooms); // Update the rooms state with the sorted list
-  };
+    setRooms(sortedRooms)
+  }
+
+  // Function to handle building sorting
+  const sortBuildings = (option) => {
+    const sortedBuildings = [...buildings]
+    if (option === "az") {
+      sortedBuildings.sort((a, b) => a.name.localeCompare(b.name))
+    } else if (option === "za") {
+      sortedBuildings.sort((a, b) => b.name.localeCompare(a.name))
+    }
+    setBuildings(sortedBuildings)
+  }
 
   // Handler for when the sort option changes
   const handleSortChange = (e) => {
-    const newSortOption = e.target.value;
-    setSortOption(newSortOption); // Update the selected sort option
-    sortRooms(newSortOption); // Sort the rooms based on the new option
-  };
+    const value = e.target.value
+    setSortOption(value)
+    sortRooms(value)
+  }
+
+  // Handler for when the building sort option changes
+  const handleBuildingSortChange = (e) => {
+    const value = e.target.value
+    setBuildingSortOption(value)
+    sortBuildings(value)
+  }
 
   // Filtered rooms based on search term
-  const filteredRooms = rooms.filter(room =>
-    room.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredRooms = rooms.filter((room) => room.name.toLowerCase().includes(searchTerm.toLowerCase()))
+
+  // Filtered buildings based on search term
+  const filteredBuildings = buildings.filter((building) =>
+    building.name.toLowerCase().includes(buildingSearchTerm.toLowerCase()),
+  )
 
   // Delete a building
   const deleteBuilding = async (buildingId) => {
     try {
-      await axios.delete(`http://localhost:5000/api/buildings/${buildingId}`);
-      // Refresh buildings list
-      fetchBuildings();
+      await axios.delete(`http://localhost:5000/api/buildings/${buildingId}`)
+      fetchBuildings()
     } catch (error) {
-      console.error('Error deleting building:', error);
-      alert('Failed to delete building. Please try again.');
+      console.error("Error deleting building:", error)
+      alert("Failed to delete building. Please try again.")
     }
-  };
+  }
 
   // Delete a room
   const deleteRoom = async (roomId) => {
     try {
-      await axios.delete(`http://localhost:5000/api/rooms/${roomId}`);
-      // Refresh rooms list if we have a selected building
+      await axios.delete(`http://localhost:5000/api/rooms/${roomId}`)
       if (selectedBuilding) {
-        fetchRooms(selectedBuilding);
+        fetchRooms(selectedBuilding)
       }
     } catch (error) {
-      console.error('Error deleting room:', error);
-      alert('Failed to delete room. Please try again.');
+      console.error("Error deleting room:", error)
+      alert("Failed to delete room. Please try again.")
     }
-  };
+  }
 
   // Fetch devices for a room and open modal
   const fetchDevices = (room) => {
-    axios.get(`http://localhost:5000/api/rooms/${room.id}/devices`)
+    axios
+      .get(`http://localhost:5000/api/rooms/${room.id}/devices`)
       .then((response) => {
-        setDevices(response.data);
-        setSelectedRoom(room);
-        setShowDevicesModal(true);
+        setDevices(response.data)
+        setSelectedRoom(room)
+        setShowDevicesModal(true)
       })
       .catch((error) => {
-        console.error('Error fetching devices:', error);
-      });
-  };
+        console.error("Error fetching devices:", error)
+      })
+  }
 
   const closeDevicesModal = () => {
-    setShowDevicesModal(false);
-    setSelectedRoom(null);
-    setDevices([]);
-  };
+    setShowDevicesModal(false)
+    setSelectedRoom(null)
+    setDevices([])
+  }
 
-  const navigate = useNavigate();
-  
+  const navigate = useNavigate()
+
   return (
-    <div style={{display:'flex',minHeight:'100vh'}}>
-      <Sidebar />
-      <div className="main">
-        <header>
-          <h1>UEcoManage Admin</h1>
-          <p style={{ color: '#475569', marginTop: '10px' }}>
-            Monitor and manage buildings, rooms, and devices.
-          </p>
+    <div className="app-container">
+      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
 
-          <div className="controls-right">
-            <button onClick={() => setShowAddBuildingModal(true)}>Add Building</button>
-            {/* You can implement Edit Building button logic later */}
-            <button 
-              onClick={() => {
-                if (!selectedBuilding) {
-                  alert("Please select a building to edit");
-                  return;
-                }
-                setBuildingToEdit(selectedBuilding);
-                setEditBuildingName(selectedBuilding.name);
-                setEditBuildingDescription(selectedBuilding.description || '');
-                setShowEditBuildingModal(true);
-              }}
-            >
-              Edit Building
-            </button>
-          </div>
-        </header>
-
-        <BuildingNavbar
-          buildings={buildings}
-          activeBuilding={selectedBuilding}
-          onSelectBuilding={fetchRooms}
-          onDeleteBuilding={deleteBuilding}
-        />
-
-        {/* Add Building Modal */}
-        {showAddBuildingModal && (
-          <div className="modal-overlay">
-            <div className="modal">
-              <h2>Add Building</h2>
-              <input
-                type="text"
-                placeholder="Building Name"
-                value={newBuilding.name}
-                onChange={(e) => setNewBuilding({ ...newBuilding, name: e.target.value })}
-              />
-              <input
-                type="text"
-                placeholder="Description"
-                value={newBuilding.description}
-                onChange={(e) => setNewBuilding({ ...newBuilding, description: e.target.value })}
-              />
-              <div className="modal-buttons">
-                <button onClick={addBuilding}>Add Building</button>
-                <button onClick={() => setShowAddBuildingModal(false)}>Cancel</button>
-              </div>
+      <div className="main-content">
+        <div className="content-wrapper">
+          <div className="page-header">
+            <div className="header-content">
+              <h1 className="page-title">Energy Management Dashboard</h1>
+              <p className="page-subtitle">Monitor and optimize your building's energy consumption</p>
             </div>
-          </div>
-        )}
-        {/* Edit Building Modal */}
-        {showEditBuildingModal && (
-        <div className="modal-overlay">
-          <div className="modal">
-            <button className="modal-close" onClick={() => setShowEditBuildingModal(false)}>×</button>
-            <h2>Edit Building</h2>
-
-            <select
-              value={buildingToEdit?.id || ''}
-              onChange={(e) => {
-                const selectedId = parseInt(e.target.value);
-                const building = buildings.find(b => b.id === selectedId);
-                setBuildingToEdit(building);
-                setEditBuildingName(building?.name || '');
-                setEditBuildingDescription(building?.description || '');
-              }}
-            >
-              <option value="" disabled>Select Building</option>
-              {buildings.map(building => (
-                <option key={building.id} value={building.id}>{building.name}</option>
-              ))}
-            </select>
-
-            <input
-              type="text"
-              placeholder="Building Name"
-              value={editBuildingName}
-              onChange={(e) => setEditBuildingName(e.target.value)}
-            />
-            <input
-              type="text"
-              placeholder="Description"
-              value={editBuildingDescription}
-              onChange={(e) => setEditBuildingDescription(e.target.value)}
-            />
-
-            <div className="modal-buttons">
-              <button onClick={handleUpdateBuilding}>Update Building</button>
-              <button onClick={() => setShowEditBuildingModal(false)}>Cancel</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-        {/* Rooms Section */}
-        {selectedBuilding && (
-          <section className="rooms">
-            <div className="rooms-header">
-              <h2>Rooms in {selectedBuilding.name}</h2>
-              <div className="controls-container">
-              <div className="controls-left">
-                <input 
-                type="text" 
-                id="roomSearch" 
-                placeholder="Search..." 
-                value ={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)} />
-                
-                <select
-                  id="roomSort"
-                  value={sortOption}
-                  onChange={handleSortChange}
-                >
-                  <option value="az">A–Z</option>
-                  <option value="za">Z–A</option>
-                </select>
-              </div>
-              <div className="controls-right">
-                <button onClick={() => {
-                  setShowAddRoomModal(true);
-                  setNewRoomBuildingId(selectedBuilding.id);
-                }}>
-                  Add Room
-                </button>
-                <button onClick={() => setShowEditRoomModal(true)}>Edit Room</button>
-                <button 
-                  onClick={() => {
-                    if (!selectedRoom) {
-                      alert("Please select a room to delete");
-                      return;
-                    }
-                    if (window.confirm(`Are you sure you want to delete ${selectedRoom.name}? This will also delete all devices in it.`)) {
-                      deleteRoom(selectedRoom.id);
-                    }
-                  }}
-                >
-                  Delete Room
-                </button>
-              </div>
-              </div>
-            </div>
-
-            <div className="rooms-grid">
-              {/* Renders each room in the filtered rooms list as a clickable card,
-                  allowing users to view devices associated with the room. */}
-              {filteredRooms.map((room) => (
-                <div
-                  key={room.id}
-                  className="room-card"
-                  onClick={() => navigate(`/devices/${room.id}`)}
-                >
-                  <div className="room-card-content">
-                    {room.name}
-                  </div>
-                  <button 
-                    className="edit-room-btn"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setRoomToEditId(room.id);
-                      setEditRoomName(room.name);
-                      setEditRoomCamera(room.live_camera || '');
-                      setShowEditRoomModal(true);
-                    }}
-                    title="Edit room"
-                  >
-                    ✎
+            <div className="header-actions">
+              {/* Building buttons - show only when buildings tab is active */}
+              {activeTab === "buildings" && (
+                <>
+                  <button className="btn btn-primary" onClick={() => setShowAddBuildingModal(true)}>
+                    <FaPlus className="btn-icon" />
+                    Add Building
                   </button>
-                  <button 
-                    className="delete-room-btn"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (window.confirm(`Are you sure you want to delete ${room.name}? This will also delete all devices in it.`)) {
-                        deleteRoom(room.id);
+                  <button
+                    className="btn btn-secondary"
+                    onClick={() => {
+                      if (!selectedBuilding) {
+                        alert("Please select a building to edit")
+                        return
                       }
+                      setBuildingToEdit(selectedBuilding)
+                      setEditBuildingName(selectedBuilding.name)
+                      setEditBuildingDescription(selectedBuilding.description || "")
+                      setShowEditBuildingModal(true)
                     }}
-                    title="Delete room"
                   >
-                    ×
+                    <FaEdit className="btn-icon" />
+                    Edit Building
+                  </button>
+                </>
+              )}
+
+              {/* Room buttons - show only when rooms tab is active */}
+              {activeTab === "rooms" && selectedBuilding && (
+                <>
+                  <button
+                    className="btn btn-primary"
+                    onClick={() => {
+                      setShowAddRoomModal(true)
+                      setNewRoomBuildingId(selectedBuilding.id)
+                    }}
+                  >
+                    <FaPlus className="btn-icon" />
+                    Add Room
+                  </button>
+                  <button className="btn btn-secondary" onClick={() => setShowEditRoomModal(true)}>
+                    <FaEdit className="btn-icon" />
+                    Edit Room
+                  </button>
+                </>
+              )}
+
+              {/* No buttons for dashboard and analytics tabs */}
+            </div>
+          </div>
+
+          {/* Building Navbar - Show only for rooms tab */}
+          {activeTab === "rooms" && (
+            <BuildingNavbar
+              buildings={buildings}
+              activeBuilding={selectedBuilding}
+              onSelectBuilding={fetchRooms}
+              fromBuildingsPage={false}
+            />
+          )}
+
+          {activeTab === "dashboard" && (
+            <div className="dashboard-content">
+              {/* Energy Overview Cards */}
+              <div className="stats-grid">
+                <div className="stat-card">
+                  <div className="stat-header">
+                    <div className="stat-title">Total Consumption</div>
+                    <FaBolt className="stat-icon consumption" />
+                  </div>
+                  <div className="stat-value">{energyData.totalConsumption} kWh</div>
+                  <div className="stat-change positive">
+                    <FaArrowDown className="change-icon" />
+                    12% from last month
+                  </div>
+                </div>
+
+                <div className="stat-card">
+                  <div className="stat-header">
+                    <div className="stat-title">Monthly Savings</div>
+                    <FaDollarSign className="stat-icon savings" />
+                  </div>
+                  <div className="stat-value">${energyData.monthlySavings}</div>
+                  <div className="stat-change positive">
+                    <FaArrowUp className="change-icon" />
+                    8% increase
+                  </div>
+                </div>
+
+                <div className="stat-card">
+                  <div className="stat-header">
+                    <div className="stat-title">Efficiency Score</div>
+                    <FaChartBar className="stat-icon efficiency" />
+                  </div>
+                  <div className="stat-value">{energyData.efficiency}%</div>
+                  <div className="efficiency-bar">
+                    <div className="efficiency-fill" style={{ width: `${energyData.efficiency}%` }}></div>
+                  </div>
+                </div>
+
+                <div className="stat-card">
+                  <div className="stat-header">
+                    <div className="stat-title">Carbon Reduction</div>
+                    <FaLeaf className="stat-icon carbon" />
+                  </div>
+                  <div className="stat-value">{energyData.carbonReduction}t CO₂</div>
+                  <div className="stat-change">This month</div>
+                </div>
+              </div>
+
+              {/* Building Status */}
+              <div className="dashboard-grid">
+                <div className="dashboard-card">
+                  <div className="card-header">
+                    <h3 className="card-title">Building Status</h3>
+                    <p className="card-subtitle">Real-time monitoring of your facilities</p>
+                  </div>
+                </div>
+
+                <div className="dashboard-card">
+                  <div className="card-header">
+                    <h3 className="card-title">Recent Activity</h3>
+                    <p className="card-subtitle">Latest system updates</p>
+                  </div>
+                  <div className="card-content">
+                    <div className="activity-item">
+                      <div className="activity-icon">
+                        <FaBuilding />
+                      </div>
+                      <div className="activity-details">
+                        <div className="activity-title">Building added</div>
+                        <div className="activity-time">2 minutes ago</div>
+                      </div>
+                    </div>
+                    <div className="activity-item">
+                      <div className="activity-icon">
+                        <FaDoorOpen />
+                      </div>
+                      <div className="activity-details">
+                        <div className="activity-title">Room updated</div>
+                        <div className="activity-time">5 minutes ago</div>
+                      </div>
+                    </div>
+                    <div className="activity-item">
+                      <div className="activity-icon">
+                        <FaBolt />
+                      </div>
+                      <div className="activity-details">
+                        <div className="activity-title">Energy report generated</div>
+                        <div className="activity-time">1 hour ago</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === "buildings" && (
+            <div className="buildings-content">
+              <BuildingNavbar
+                buildings={buildings}
+                activeBuilding={selectedBuilding}
+                onSelectBuilding={fetchRooms}
+                fromBuildingsPage={true}
+                setActiveTab={setActiveTab}
+              />
+
+              {/* Buildings header with search and sort */}
+              <div className="rooms-header">
+                <div style={{ marginBottom: "16px" }}>
+                  <div className="rooms-title">
+                    <FaBuilding className="rooms-icon" />
+                    Buildings
+                  </div>
+                </div>
+                <div className="rooms-controls">
+                  <div className="search-controls">
+                    <div className="search-box">
+                      <FaSearch className="search-icon" />
+                      <input
+                        type="text"
+                        placeholder="Search buildings..."
+                        className="search-input"
+                        value={buildingSearchTerm}
+                        onChange={(e) => setBuildingSearchTerm(e.target.value)}
+                      />
+                    </div>
+                    <select className="sort-select" value={buildingSortOption} onChange={handleBuildingSortChange}>
+                      <option value="az">A–Z</option>
+                      <option value="za">Z–A</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div className="buildings-grid">
+                {filteredBuildings.map((building) => (
+                  <div key={building.id} className="building-card">
+                    <div className="building-card-header">
+                      <div className="building-card-title">{building.name}</div>
+                    </div>
+                    <div className="building-card-actions">
+                      <button
+                        className="action-btn edit"
+                        onClick={() => {
+                          setBuildingToEdit(building)
+                          setEditBuildingName(building.name)
+                          setEditBuildingDescription(building.description || "")
+                          setShowEditBuildingModal(true)
+                        }}
+                        title="Edit building"
+                      >
+                        ✎
+                      </button>
+                      <button
+                        className="action-btn delete"
+                        onClick={() => {
+                          if (window.confirm(`Delete ${building.name}?`)) {
+                            deleteBuilding(building.id)
+                          }
+                        }}
+                        title="Delete building"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {activeTab === "rooms" && selectedBuilding && (
+            <div className="rooms-content">
+              {/* Navbar with only search and sort */}
+              <div className="rooms-header">
+                <div style={{ marginBottom: "16px" }}>
+                  <div className="rooms-title">
+                    <FaBuilding className="rooms-icon" />
+                    Rooms in {selectedBuilding.name}
+                  </div>
+                </div>
+                <div className="rooms-controls">
+                  <div className="search-controls">
+                    <div className="search-box">
+                      <FaSearch className="search-icon" />
+                      <input
+                        type="text"
+                        placeholder="Search rooms..."
+                        className="search-input"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                      />
+                    </div>
+                    <select className="sort-select" value={sortOption} onChange={handleSortChange}>
+                      <option value="az">A–Z</option>
+                      <option value="za">Z–A</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rooms-grid">
+                {filteredRooms.map((room) => (
+                  <div
+                    key={room.id}
+                    className="room-card"
+                    onClick={() => {
+                      setSelectedRoom(room)
+                      navigate(`/devices/${room.id}`)
+                    }}
+                  >
+                    <div className="room-header">
+                      <div className="room-info">
+                        <FaDoorOpen className="room-icon" />
+                        <span className="room-name">{room.name}</span>
+                      </div>
+                      <div className="room-status online">
+                        <FaWifi className="status-icon" />
+                        Active
+                      </div>
+                    </div>
+                    <div className="room-content">
+                      <div className="room-detail">
+                        <span className="detail-label">Camera:</span>
+                        <span className="detail-value">{room.live_camera || "No camera"}</span>
+                      </div>
+                      {/* Add device count detail */}
+                      <div className="room-detail">
+                        <span className="detail-label">Devices:</span>
+                        <span className="detail-value">{room.devices_count || 0}</span>
+                      </div>
+                    </div>
+                    <div className="room-actions">
+                      <button
+                        className="action-btn edit"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setRoomToEditId(room.id)
+                          setEditRoomName(room.name)
+                          setEditRoomCamera(room.live_camera || "")
+                          setShowEditRoomModal(true)
+                          setSelectedRoom(room)
+                        }}
+                        title="Edit room"
+                      >
+                        <FaPencilAlt />
+                      </button>
+                      <button
+                        className="action-btn delete"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setSelectedRoom(room)
+                          if (window.confirm(`Delete ${room.name}?`)) {
+                            deleteRoom(room.id)
+                          }
+                        }}
+                        title="Delete room"
+                      >
+                        <FaTrash />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {activeTab === "analytics" && (
+            <div className="analytics-content">
+              <div className="analytics-grid">
+                <div className="analytics-card">
+                  <div className="card-header">
+                    <h3 className="card-title">Energy Consumption Trends</h3>
+                    <p className="card-subtitle">Weekly consumption patterns</p>
+                  </div>
+                  <div className="chart-placeholder">
+                    <FaChartBar className="chart-icon" />
+                    <p>Chart visualization would go here</p>
+                  </div>
+                </div>
+
+                <div className="analytics-card">
+                  <div className="card-header">
+                    <h3 className="card-title">Cost Analysis</h3>
+                    <p className="card-subtitle">Monthly cost breakdown</p>
+                  </div>
+                  <div className="chart-placeholder">
+                    <FaDollarSign className="chart-icon" />
+                    <p>Cost analysis chart would go here</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="recommendations-card">
+                <div className="card-header">
+                  <h3 className="card-title">Efficiency Recommendations</h3>
+                  <p className="card-subtitle">AI-powered suggestions to optimize energy usage</p>
+                </div>
+                <div className="recommendations-list">
+                  <div className="recommendation high">
+                    <div className="recommendation-priority">High Impact</div>
+                    <div className="recommendation-text">
+                      Reduce HVAC usage during off-hours to save up to $340/month
+                    </div>
+                  </div>
+                  <div className="recommendation medium">
+                    <div className="recommendation-priority">Medium Impact</div>
+                    <div className="recommendation-text">Upgrade to LED lighting in Warehouse A to save $120/month</div>
+                  </div>
+                  <div className="recommendation low">
+                    <div className="recommendation-priority">Low Impact</div>
+                    <div className="recommendation-text">Install smart power strips to eliminate phantom loads</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Modals */}
+          {showAddBuildingModal && (
+            <div className="modal-overlay">
+              <div className="modal">
+                <div className="modal-header">
+                  <h2 className="modal-title">Add Building</h2>
+                  <p className="modal-subtitle">Create a new building to manage rooms and devices.</p>
+                </div>
+                <div className="modal-content">
+                  <div className="form-group">
+                    <label className="form-label">Building Name</label>
+                    <input
+                      className="form-input"
+                      type="text"
+                      placeholder="Enter building name"
+                      value={newBuilding.name}
+                      onChange={(e) => setNewBuilding({ ...newBuilding, name: e.target.value })}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Description</label>
+                    <input
+                      className="form-input"
+                      type="text"
+                      placeholder="Enter description (optional)"
+                      value={newBuilding.description}
+                      onChange={(e) => setNewBuilding({ ...newBuilding, description: e.target.value })}
+                    />
+                  </div>
+                </div>
+                <div className="modal-footer">
+                  <button className="btn btn-secondary" onClick={() => setShowAddBuildingModal(false)}>
+                    Cancel
+                  </button>
+                  <button className="btn btn-primary" onClick={addBuilding}>
+                    Add Building
                   </button>
                 </div>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* Add Room Modal */}
-        {showAddRoomModal && (
-          <div className="modal-overlay">
-            <div className="modal">
-              <button className="modal-close" onClick={() => setShowAddRoomModal(false)}>×</button>
-              <h2>Add New Room</h2>
-
-              <select
-                value={newRoomBuildingId}
-                onChange={(e) => setNewRoomBuildingId(parseInt(e.target.value))}
-              >
-                <option value="" disabled>Select Building</option>
-                {buildings.map((b) => (
-                  <option key={b.id} value={b.id}>{b.name}</option>
-                ))}
-              </select>
-
-              <input
-                type="text"
-                value={newRoomName}
-                onChange={(e) => setNewRoomName(e.target.value)}
-                placeholder="Room Name (e.g. EN205)"
-              />
-
-              <input
-                type="text"
-                value={newRoomCamera}
-                onChange={(e) => setNewRoomCamera(e.target.value)}
-                placeholder="Camera IP (e.g. 192.168.12)"
-              />
-
-              <div className="modal-buttons">
-                <button className="cancel-btn" onClick={() => setShowAddRoomModal(false)}>Cancel</button>
-                <button onClick={addRoom}>Add Room</button>
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Edit Room Modal */}
-        {showEditRoomModal && (
-          <div className="modal-overlay">
-            <div className="modal">
-              <button className="modal-close" onClick={() => setShowEditRoomModal(false)}>×</button>
-              <h2>Edit Room</h2>
-
-              <select
-                value={roomToEditId || ''}
-                onChange={(e) => {
-                  const selectedId = parseInt(e.target.value);
-                  setRoomToEditId(selectedId);
-
-                  const room = rooms.find(r => r.id === selectedId);
-                  if (room) {
-                    setEditRoomName(room.name);
-                    setEditRoomCamera(room.live_camera || '');
-                  } else {
-                    setEditRoomName('');
-                    setEditRoomCamera('');
-                  }
-                }}
-              >
-                <option value="" disabled>Select Room</option>
-                {rooms.map(room => (
-                  <option key={room.id} value={room.id}>{room.name}</option>
-                ))}
-              </select>
-
-              <input
-                type="text"
-                value={editRoomName}
-                onChange={(e) => setEditRoomName(e.target.value)}
-                placeholder="Room Name"
-              />
-
-              <input
-                type="text"
-                value={editRoomCamera}
-                onChange={(e) => setEditRoomCamera(e.target.value)}
-                placeholder="Camera IP"
-              />
-
-              <div className="modal-buttons">
-                <button className="cancel-btn" onClick={() => setShowEditRoomModal(false)}>Cancel</button>
-                <button onClick={handleUpdateRoom}>Update Room</button>
+          {showEditBuildingModal && (
+            <div className="modal-overlay">
+              <div className="modal">
+                <div className="modal-header">
+                  <h2 className="modal-title">Edit Building</h2>
+                  <p className="modal-subtitle">Update building information.</p>
+                </div>
+                <div className="modal-content">
+                  <div className="form-group">
+                    <label className="form-label">Select Building</label>
+                    <select
+                      className="form-select"
+                      value={buildingToEdit?.id?.toString() || ""}
+                      onChange={(e) => {
+                        const selectedId = Number.parseInt(e.target.value)
+                        const building = buildings.find((b) => b.id === selectedId)
+                        setBuildingToEdit(building)
+                        setEditBuildingName(building?.name || "")
+                        setEditBuildingDescription(building?.description || "")
+                      }}
+                    >
+                      <option value="" disabled>
+                        Select a building
+                      </option>
+                      {buildings.map((building) => (
+                        <option key={building.id} value={building.id.toString()}>
+                          {building.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Building Name</label>
+                    <input
+                      className="form-input"
+                      type="text"
+                      placeholder="Enter building name"
+                      value={editBuildingName}
+                      onChange={(e) => setEditBuildingName(e.target.value)}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Description</label>
+                    <input
+                      className="form-input"
+                      type="text"
+                      placeholder="Enter description (optional)"
+                      value={editBuildingDescription}
+                      onChange={(e) => setEditBuildingDescription(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <div className="modal-footer">
+                  <button className="btn btn-secondary" onClick={() => setShowEditBuildingModal(false)}>
+                    Cancel
+                  </button>
+                  <button className="btn btn-primary" onClick={handleUpdateBuilding}>
+                    Update Building
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Devices Modal */}
-        {showDevicesModal && (
-          <div className="modal-overlay" onClick={closeDevicesModal}>
-            <div className="modal" onClick={(e) => e.stopPropagation()}>
-              <button className="modal-close" onClick={closeDevicesModal}>×</button>
-              <h2>Devices in {selectedRoom?.name}</h2>
-              <ul>
-                {devices.map(device => (
-                  <li key={device.id}>{device.name}</li>
-                ))}
-              </ul>
+          {showAddRoomModal && (
+            <div className="modal-overlay">
+              <div className="modal">
+                <div className="modal-header">
+                  <h2 className="modal-title">Add New Room</h2>
+                  <p className="modal-subtitle">Create a new room in the selected building.</p>
+                </div>
+                <div className="modal-content">
+                  <div className="form-group">
+                    <label className="form-label">Select Building</label>
+                    <select
+                      className="form-select"
+                      value={newRoomBuildingId?.toString() || ""}
+                      onChange={(e) => setNewRoomBuildingId(Number.parseInt(e.target.value))}
+                    >
+                      <option value="" disabled>
+                        Select a building
+                      </option>
+                      {buildings.map((building) => (
+                        <option key={building.id} value={building.id.toString()}>
+                          {building.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Room Name</label>
+                    <input
+                      className="form-input"
+                      type="text"
+                      placeholder="Room Name (e.g. EN205)"
+                      value={newRoomName}
+                      onChange={(e) => setNewRoomName(e.target.value)}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Camera IP</label>
+                    <input
+                      className="form-input"
+                      type="text"
+                      placeholder="Camera IP (e.g. 192.168.12)"
+                      value={newRoomCamera}
+                      onChange={(e) => setNewRoomCamera(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <div className="modal-footer">
+                  <button className="btn btn-secondary" onClick={() => setShowAddRoomModal(false)}>
+                    Cancel
+                  </button>
+                  <button className="btn btn-primary" onClick={addRoom}>
+                    Add Room
+                  </button>
+                </div>
+              </div>
             </div>
-          </div>
-        )}
+          )}
+
+          {showEditRoomModal && (
+            <div className="modal-overlay">
+              <div className="modal">
+                <div className="modal-header">
+                  <h2 className="modal-title">Edit Room</h2>
+                  <p className="modal-subtitle">Update room information.</p>
+                </div>
+                <div className="modal-content">
+                  <div className="form-group">
+                    <label className="form-label">Select Room</label>
+                    <select
+                      className="form-select"
+                      value={roomToEditId?.toString() || ""}
+                      onChange={(e) => {
+                        const selectedId = Number.parseInt(e.target.value)
+                        setRoomToEditId(selectedId)
+
+                        const room = rooms.find((r) => r.id === selectedId)
+                        if (room) {
+                          setEditRoomName(room.name)
+                          setEditRoomCamera(room.live_camera || "")
+                        } else {
+                          setEditRoomName("")
+                          setEditRoomCamera("")
+                        }
+                      }}
+                    >
+                      <option value="" disabled>
+                        Select a room
+                      </option>
+                      {rooms.map((room) => (
+                        <option key={room.id} value={room.id.toString()}>
+                          {room.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Room Name</label>
+                    <input
+                      className="form-input"
+                      type="text"
+                      placeholder="Room Name"
+                      value={editRoomName}
+                      onChange={(e) => setEditRoomName(e.target.value)}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Camera IP</label>
+                    <input
+                      className="form-input"
+                      type="text"
+                      placeholder="Camera IP"
+                      value={editRoomCamera}
+                      onChange={(e) => setEditRoomCamera(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <div className="modal-footer">
+                  <button className="btn btn-secondary" onClick={() => setShowEditRoomModal(false)}>
+                    Cancel
+                  </button>
+                  <button className="btn btn-primary" onClick={handleUpdateRoom}>
+                    Update Room
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {showDevicesModal && (
+            <div className="modal-overlay" onClick={closeDevicesModal}>
+              <div className="modal" onClick={(e) => e.stopPropagation()}>
+                <div className="modal-header">
+                  <h2 className="modal-title">Devices in {selectedRoom?.name}</h2>
+                  <p className="modal-subtitle">View all devices in this room.</p>
+                </div>
+                <div className="modal-content">
+                  {devices.length > 0 ? (
+                    <div className="device-list">
+                      {devices.map((device) => (
+                        <div key={device.id} className="device-item">
+                          <FaWifi className="device-icon" />
+                          <span>{device.name}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="empty-state">No devices found in this room.</div>
+                  )}
+                </div>
+                <div className="modal-footer">
+                  <button className="btn btn-primary" onClick={closeDevicesModal}>
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
-  );
-};
+  )
+}
 
-export default BuildingNavigation;
+export default BuildingNavigation

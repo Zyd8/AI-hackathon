@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import AdminLogin from './admin-login';
+import Dashboard from './dashboard';
 import BuildingNavigation from './building';
 import DevicesPage from './devices';
-import AdminLogin from './admin-login';
+import Analytics from './analytics';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -24,31 +26,31 @@ function App() {
   return (
     <Router>
       <Routes>
-        <Route 
-          path="/building" 
-          element={
-            <ProtectedRoute 
-              element={BuildingNavigation} 
-            />
-          } 
+        <Route
+          path="/building"
+          element={<ProtectedRoute element={BuildingNavigation} />}
         />
-        <Route 
-          path="/devices/:roomId" 
-          element={
-            <ProtectedRoute 
-              element={DevicesPage} 
-            />
-          } 
+        <Route
+          path="/devices/:roomId"
+          element={<ProtectedRoute element={DevicesPage} />}
         />
-        <Route 
-          path="/admin-login" 
+        <Route
+          path="/admin-login"
           element={
             isAuthenticated ? (
               <Navigate to="/building" replace />
             ) : (
               <AdminLogin onLogin={handleLogin} />
             )
-          } 
+          }
+        />
+        <Route
+          path="/dashboard"
+          element={<ProtectedRoute element={Dashboard} />}
+        />
+        <Route
+          path="/analytics"
+          element={<ProtectedRoute element={Analytics} />}
         />
         <Route path="/" element={<Navigate to="/admin-login" replace />} />
       </Routes>

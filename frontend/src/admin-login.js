@@ -1,70 +1,117 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import './admin-login.css'; // Add custom styles here
-import axios from 'axios';
+import { useState } from "react"
+import { useNavigate } from "react-router-dom"
+import "./admin-login.css"
+import axios from "axios"
+import { FaBolt, FaUser, FaLock, FaEye, FaEyeSlash } from "react-icons/fa"
 
-// Import the Express module
 const AdminLogin = ({ onLogin }) => {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const navigate = useNavigate();
+  const [username, setUsername] = useState("")
+  const [password, setPassword] = useState("")
+  const [error, setError] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const navigate = useNavigate()
 
   const handleLogin = async (e) => {
-    e.preventDefault();
+    e.preventDefault()
+    setLoading(true)
+    setError("")
 
     try {
-      // Send POST request to Flask backend
-      const response = await axios.post('http://localhost:5000/api/login', {
+      const response = await axios.post("http://localhost:5000/api/login", {
         username,
         password,
-      });
+      })
 
       if (response.data.success) {
-        onLogin();            // Run any login success action (e.g., set auth state)
-        navigate('/building');  // Redirect to dashboard or protected route
+        onLogin()
+        navigate("/building")
       } else {
-        setError('Invalid username or password');
+        setError("Invalid username or password")
       }
     } catch (err) {
-      
-      // Handle errors (like network errors or 401 from backend)
       if (err.response && err.response.status === 401) {
-        setError('Invalid username or password');
+        setError("Invalid username or password")
       } else {
-        setError('Something went wrong. Please try again later.');
+        setError("Something went wrong. Please try again later.")
       }
+    } finally {
+      setLoading(false)
     }
-  };
+  }
+
   return (
     <div className="login-container">
-      <div className="login-box">
-        <h2>Admin Login</h2>
-        <form onSubmit={handleLogin}>
-          <div className="input-container">
-            <input
-              type="text"
-              placeholder="Username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              required
-            />
+      <div className="login-background">
+        <div className="login-card">
+          <div className="login-header">
+            <div className="login-logo">
+              <FaBolt className="logo-icon" />
+              <h1 className="logo-title">EcoVolt</h1>
+            </div>
+            <h2 className="login-title">Admin Login</h2>
+            <p className="login-subtitle">Access your energy management dashboard</p>
           </div>
-          <div className="input-container">
-            <input
-              type="password"
-              placeholder="Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
+
+          <form onSubmit={handleLogin} className="login-form">
+            <div className="form-group">
+              <label className="form-label">Username</label>
+              <div className="input-wrapper">
+                <FaUser className="input-icon" />
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="Enter your username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Password</label>
+              <div className="input-wrapper">
+                <FaLock className="input-icon" />
+                <input
+                  type={showPassword ? "text" : "password"}
+                  className="form-input"
+                  placeholder="Enter your password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+                <button type="button" className="password-toggle" onClick={() => setShowPassword(!showPassword)}>
+                  {showPassword ? <FaEyeSlash /> : <FaEye />}
+                </button>
+              </div>
+            </div>
+
+            {error && (
+              <div className="error-message">
+                <span>{error}</span>
+              </div>
+            )}
+
+            <button type="submit" className={`login-btn ${loading ? "loading" : ""}`} disabled={loading}>
+              {loading ? (
+                <>
+                  <div className="spinner"></div>
+                  Signing in...
+                </>
+              ) : (
+                "Sign In"
+              )}
+            </button>
+          </form>
+
+          <div className="login-footer">
+            <p>Secure energy management system</p>
           </div>
-          {error && <div className="error-message">{error}</div>}
-          <button type="submit" className="login-btn">Login</button>
-        </form>
+        </div>
       </div>
     </div>
-  );
-};
+  )
+}
 
-export default AdminLogin;
+export default AdminLogin
