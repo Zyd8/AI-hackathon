@@ -15,6 +15,7 @@ import {
   FaUsers,
   FaCog,
   FaChartBar,
+  FaInfoCircle,
 } from "react-icons/fa"
 
 const Sidebar = ({ activeTab, setActiveTab }) => (
@@ -195,9 +196,8 @@ const DevicesPage = () => {
     hardware_id: "",
     name: "",
     is_enabled: true,
-    persons_before_enabled: 1,  // Changed from 0 to 1
+    persons_before_enabled: 1,
     delay_before_enabled: 0,
-    persons_before_disabled: 0,
     delay_before_disabled: 0,
   })
 
@@ -276,9 +276,8 @@ const DevicesPage = () => {
           name: newDevice.name || existingDevice.name,
           room_id: Number.parseInt(roomId),
           is_enabled: newDevice.is_enabled,
-          persons_before_enabled: Number.parseInt(newDevice.persons_before_enabled) || 0,
+          persons_before_enabled: Number.parseInt(newDevice.persons_before_enabled) || 1,
           delay_before_enabled: Number.parseInt(newDevice.delay_before_enabled) || 0,
-          persons_before_disabled: Number.parseInt(newDevice.persons_before_disabled) || 0,
           delay_before_disabled: Number.parseInt(newDevice.delay_before_disabled) || 0,
           is_manual: !!newDevice.is_manual,
         })
@@ -288,9 +287,8 @@ const DevicesPage = () => {
         const response = await axios.post(`http://localhost:5000/api/rooms/${roomId}/devices`, {
           ...newDevice,
           hardware_id: newDevice.hardware_id, // Keep as string
-          persons_before_enabled: Number.parseInt(newDevice.persons_before_enabled) || 0,
+          persons_before_enabled: Number.parseInt(newDevice.persons_before_enabled) || 1,
           delay_before_enabled: Number.parseInt(newDevice.delay_before_enabled) || 0,
-          persons_before_disabled: Number.parseInt(newDevice.persons_before_disabled) || 0,
           delay_before_disabled: Number.parseInt(newDevice.delay_before_disabled) || 0,
           is_manual: !!newDevice.is_manual,
         })
@@ -326,9 +324,8 @@ const DevicesPage = () => {
         ...deviceToEdit,
         // Ensure numeric fields are properly formatted
         hardware_id: String(deviceToEdit.hardware_id),
-        persons_before_enabled: Number.parseInt(deviceToEdit.persons_before_enabled) || 0,
+        persons_before_enabled: Number.parseInt(deviceToEdit.persons_before_enabled) || 1,
         delay_before_enabled: Number.parseInt(deviceToEdit.delay_before_enabled) || 0,
-        persons_before_disabled: Number.parseInt(deviceToEdit.persons_before_disabled) || 0,
         delay_before_disabled: Number.parseInt(deviceToEdit.delay_before_disabled) || 0,
         // Ensure room_id is included
         room_id: deviceToEdit.room_id || Number.parseInt(roomId),
@@ -567,13 +564,13 @@ const DevicesPage = () => {
                       <div className="setting-item">
                         <span className="setting-label">Enable when:</span>
                         <span className="setting-value">
-                          {device.persons_before_enabled} persons for {device.delay_before_enabled}s
+                          {device.persons_before_enabled}+ persons for {device.delay_before_enabled}s
                         </span>
                       </div>
                       <div className="setting-item">
                         <span className="setting-label">Disable when:</span>
                         <span className="setting-value">
-                          {device.persons_before_disabled} persons for {device.delay_before_disabled}s
+                          {'<'}{device.persons_before_enabled} persons for {device.delay_before_disabled || device.delay_before_enabled}s
                         </span>
                       </div>
                     </div>
@@ -640,9 +637,10 @@ const DevicesPage = () => {
               </div>
               <div className="form-row">
                 <div className="form-group">
-                  <label className="form-label">Enable when (persons)</label>
+                  <label className="form-label">Enable when (persons ≥)</label>
                   <input
                     type="number"
+                    min="1"
                     name="persons_before_enabled"
                     className="form-input"
                     value={newDevice.persons_before_enabled}
@@ -653,6 +651,7 @@ const DevicesPage = () => {
                   <label className="form-label">Enable delay (seconds)</label>
                   <input
                     type="number"
+                    min="0"
                     name="delay_before_enabled"
                     className="form-input"
                     value={newDevice.delay_before_enabled}
@@ -662,24 +661,25 @@ const DevicesPage = () => {
               </div>
               <div className="form-row">
                 <div className="form-group">
-                  <label className="form-label">Disable when (persons)</label>
-                  <input
-                    type="number"
-                    name="persons_before_disabled"
-                    className="form-input"
-                    value={newDevice.persons_before_disabled}
-                    onChange={handleAddInputChange}
-                  />
-                </div>
-                <div className="form-group">
                   <label className="form-label">Disable delay (seconds)</label>
                   <input
                     type="number"
+                    min="0"
                     name="delay_before_disabled"
                     className="form-input"
                     value={newDevice.delay_before_disabled}
                     onChange={handleAddInputChange}
                   />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">
+                    <span className="hint" title="Device will disable when persons < enable threshold">
+                      Disable when: <FaInfoCircle />
+                    </span>
+                  </label>
+                  <div className="form-input hint-text">
+                    {'<'} {newDevice.persons_before_enabled} persons
+                  </div>
                 </div>
               </div>
             </div>
@@ -748,9 +748,10 @@ const DevicesPage = () => {
               </div>
               <div className="form-row">
                 <div className="form-group">
-                  <label className="form-label">Enable when (persons)</label>
+                  <label className="form-label">Enable when (persons ≥)</label>
                   <input
                     type="number"
+                    min="1"
                     name="persons_before_enabled"
                     className="form-input"
                     value={deviceToEdit.persons_before_enabled}
@@ -761,6 +762,7 @@ const DevicesPage = () => {
                   <label className="form-label">Enable delay (seconds)</label>
                   <input
                     type="number"
+                    min="0"
                     name="delay_before_enabled"
                     className="form-input"
                     value={deviceToEdit.delay_before_enabled}
@@ -770,24 +772,25 @@ const DevicesPage = () => {
               </div>
               <div className="form-row">
                 <div className="form-group">
-                  <label className="form-label">Disable when (persons)</label>
-                  <input
-                    type="number"
-                    name="persons_before_disabled"
-                    className="form-input"
-                    value={deviceToEdit.persons_before_disabled}
-                    onChange={handleEditInputChange}
-                  />
-                </div>
-                <div className="form-group">
                   <label className="form-label">Disable delay (seconds)</label>
                   <input
                     type="number"
+                    min="0"
                     name="delay_before_disabled"
                     className="form-input"
                     value={deviceToEdit.delay_before_disabled}
                     onChange={handleEditInputChange}
                   />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">
+                    <span className="hint" title="Device will disable when persons < enable threshold">
+                      Disable when: <FaInfoCircle />
+                    </span>
+                  </label>
+                  <div className="form-input hint-text">
+                    {'<'} {deviceToEdit.persons_before_enabled} persons
+                  </div>
                 </div>
               </div>
             </div>

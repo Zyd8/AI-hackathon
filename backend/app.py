@@ -41,6 +41,7 @@ class Device(db.Model):
     room_id = db.Column(db.Integer, db.ForeignKey('room.id'), nullable=True)
     persons_before_enabled = db.Column(db.Integer, nullable=True)
     delay_before_enabled = db.Column(db.Integer, nullable=True)
+    # persons_before_disabled is kept for backward compatibility but not used in logic
     persons_before_disabled = db.Column(db.Integer, nullable=True)
     delay_before_disabled = db.Column(db.Integer, nullable=True)
     is_manual = db.Column(db.Boolean, nullable=False, default=False)
@@ -586,30 +587,38 @@ def ai_device_scheduler():
                 room_id = str(device.room_id)
                 person_count = camera_service.get_person_count(room_id)
                 now = time.time()
-                # Enable logic - trigger when person count is greater than or equal to threshold
+                # Enable/Disable logic
                 if person_count is not None and device.persons_before_enabled is not None and device.delay_before_enabled is not None:
-                    if person_count >= device.persons_before_enabled:  # Changed from > to >=
+                    # Enable when person count is greater than or equal to threshold
+                    if person_count >= device.persons_before_enabled:
                         # Start/continue enable timer
                         if device.id not in last_enable_time:
                             last_enable_time[device.id] = now
+                        # Reset disable timer since we're enabling
+                        if device.id in last_disable_time:
+                            last_disable_time[device.id] = now
+                        # Check if delay has passed
                         if now - last_enable_time[device.id] >= device.delay_before_enabled:
                             if not device.is_enabled:
                                 device.is_enabled = True
                                 db.session.commit()
+                    # Disable when person count is less than enable threshold
                     else:
-                        last_enable_time[device.id] = now
-                # Disable logic - trigger when person count is less than threshold
-                if person_count is not None and device.persons_before_disabled is not None and device.delay_before_disabled is not None:
-                    if person_count < device.persons_before_disabled:  # Changed from <= to <
                         # Start/continue disable timer
                         if device.id not in last_disable_time:
                             last_disable_time[device.id] = now
-                        if now - last_disable_time[device.id] >= device.delay_before_disabled:
+                        # Reset enable timer since we're disabling
+                        if device.id in last_enable_time:
+                            last_enable_time[device.id] = now
+                        # Use delay_before_disabled if set, otherwise use delay_before_enabled
+                        disable_delay = device.delay_before_disabled if device.delay_before_disabled is not None else device.delay_before_enabled
+                        # Check if delay has passed
+                        if now - last_disable_time[device.id] >= disable_delay:
                             if device.is_enabled:
                                 device.is_enabled = False
                                 db.session.commit()
-                    else:
-                        last_disable_time[device.id] = now
+                        # Update last enable time to prevent immediate re-enable
+                        last_enable_time[device.id] = now
         time.sleep(2)
 
 # Start the AI device automation thread

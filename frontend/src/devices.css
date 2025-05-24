@@ -584,7 +584,27 @@ input:disabled + .toggle-slider {
   font-size: 14px;
   font-weight: 500;
   margin-bottom: 8px;
-  color: #374151;
+  color: #334155;
+}
+
+.hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: help;
+  color: #64748b;
+}
+
+.hint-text {
+  padding: 8px 12px;
+  background-color: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  font-size: 14px;
+  color: #334155;
+  min-height: 38px;
+  display: flex;
+  align-items: center;
 }
 
 .form-input {
