@@ -17,10 +17,11 @@ import {
   FaLeaf,
   FaArrowDown,
   FaArrowUp,
+  FaSignOutAlt,
 } from "react-icons/fa"
 import "./building.css"
 
-const Sidebar = ({ activeTab, setActiveTab }) => (
+const Sidebar = ({ activeTab, setActiveTab, onLogout }) => (
   <div className="sidebar">
     <div className="sidebar-header">
       <FaBolt className="sidebar-logo" />
@@ -56,6 +57,13 @@ const Sidebar = ({ activeTab, setActiveTab }) => (
         <FaChartBar className="nav-icon" />
         Analytics
       </button>
+      <button
+        className="nav-button logout-button"
+        onClick={onLogout}
+      >
+        <FaSignOutAlt className="nav-icon" />
+        Logout
+      </button>
     </nav>
   </div>
 )
@@ -80,7 +88,7 @@ const BuildingNavbar = ({ buildings, onSelectBuilding, activeBuilding, fromBuild
   </div>
 )
 
-const BuildingNavigation = () => {
+const BuildingNavigation = ({ onLogout }) => {
   const [activeTab, setActiveTab] = useState("buildings")
   const [buildings, setBuildings] = useState([])
   const [rooms, setRooms] = useState([])
@@ -424,7 +432,7 @@ const BuildingNavigation = () => {
 
   return (
     <div className="app-container">
-      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
+      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} onLogout={onLogout} />
 
       <div className="main-content">
         <div className="content-wrapper">

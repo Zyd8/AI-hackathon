@@ -54,6 +54,7 @@ body {
 .sidebar-nav {
   display: flex;
   flex-direction: column;
+  height: 100%;
   gap: 8px;
 }
 
@@ -1100,4 +1101,14 @@ body {
   .rooms-grid {
     grid-template-columns: 1fr;
   }
+}
+
+.logout-button {
+  margin-top: auto !important;
+  color: #ff4444 !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.logout-button:hover {
+  background-color: rgba(255, 68, 68, 0.1) !important;
 }
