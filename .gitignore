@@ -1,9 +1,7 @@
-<<<<<<< HEAD
 *venv/
 backend/__pycache__/
 backend/ai-hackathon.db
 *node_modules/
-=======
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies
@@ -27,4 +25,3 @@ backend/ai-hackathon.db
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
->>>>>>> 7c360ddb12c1e490539735a54911a8a981d10afe
