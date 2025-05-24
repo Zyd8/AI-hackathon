@@ -145,11 +145,18 @@ const BuildingNavigation = () => {
 
   // When buildings load, set selected building and fetch its rooms
   useEffect(() => {
-    if (buildings.length > 0 && !selectedBuilding) {
-      setSelectedBuilding(buildings[0])
-      fetchRooms(buildings[0])
+    if (buildings.length > 0) {
+      // If no building is selected or the selected building no longer exists
+      if (!selectedBuilding || !buildings.some(b => b.id === selectedBuilding.id)) {
+        setSelectedBuilding(buildings[0]);
+        fetchRooms(buildings[0]);
+      }
+    } else {
+      // If no buildings exist, clear the selected building and rooms
+      setSelectedBuilding(null);
+      setRooms([]);
     }
-  }, [buildings])
+  }, [buildings]);
 
   // Fetch rooms for a building
   const fetchRooms = (building) => {
@@ -339,24 +346,57 @@ const BuildingNavigation = () => {
   // Delete a building
   const deleteBuilding = async (buildingId) => {
     try {
-      await axios.delete(`http://localhost:5000/api/buildings/${buildingId}`)
-      fetchBuildings()
+      await axios.delete(`http://localhost:5000/api/buildings/${buildingId}`);
+      // After successful deletion, fetch updated buildings list
+      fetchBuildings();
+      // Clear rooms if the deleted building was selected
+      if (selectedBuilding && selectedBuilding.id === buildingId) {
+        setRooms([]);
+      }
     } catch (error) {
-      console.error("Error deleting building:", error)
-      alert("Failed to delete building. Please try again.")
+      console.error("Error deleting building:", error);
+      alert("Failed to delete building. Please try again.");
     }
-  }
+  };
 
   // Delete a room
   const deleteRoom = async (roomId) => {
-    try {
-      await axios.delete(`http://localhost:5000/api/rooms/${roomId}`)
-      if (selectedBuilding) {
-        fetchRooms(selectedBuilding)
+    if (!roomId) {
+      console.error("No room ID provided for deletion");
+      return;
+    }
+
+    if (window.confirm("Are you sure you want to delete this room? This will also delete all devices in the room.")) {
+      try {
+        // First check if the room exists
+        const checkResponse = await axios.get(`http://localhost:5000/api/buildings/${selectedBuilding.id}/rooms`);
+        const roomExists = checkResponse.data.some(room => room.id === roomId);
+        
+        if (!roomExists) {
+          alert("Room not found. It may have been already deleted.");
+          // Refresh the rooms list
+          if (selectedBuilding) {
+            fetchRooms(selectedBuilding);
+          }
+          return;
+        }
+
+        await axios.delete(`http://localhost:5000/api/rooms/${roomId}`);
+        if (selectedBuilding) {
+          fetchRooms(selectedBuilding);
+        }
+      } catch (error) {
+        console.error("Error deleting room:", error);
+        if (error.response?.status === 404) {
+          alert("Room not found. It may have been already deleted.");
+        } else {
+          alert("Failed to delete room. Please try again.");
+        }
+        // Refresh the rooms list in case of any error
+        if (selectedBuilding) {
+          fetchRooms(selectedBuilding);
+        }
       }
-    } catch (error) {
-      console.error("Error deleting room:", error)
-      alert("Failed to delete room. Please try again.")
     }
   }
 
@@ -626,99 +666,118 @@ const BuildingNavigation = () => {
             </div>
           )}
 
-          {activeTab === "rooms" && selectedBuilding && (
+          {activeTab === "rooms" && (
             <div className="rooms-content">
-              {/* Navbar with only search and sort */}
-              <div className="rooms-header">
-                <div style={{ marginBottom: "16px" }}>
-                  <div className="rooms-title">
-                    <FaBuilding className="rooms-icon" />
-                    Rooms in {selectedBuilding.name}
-                  </div>
-                </div>
-                <div className="rooms-controls">
-                  <div className="search-controls">
-                    <div className="search-box">
-                      <FaSearch className="search-icon" />
-                      <input
-                        type="text"
-                        placeholder="Search rooms..."
-                        className="search-input"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                      />
-                    </div>
-                    <select className="sort-select" value={sortOption} onChange={handleSortChange}>
-                      <option value="az">A–Z</option>
-                      <option value="za">Z–A</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-
-              <div className="rooms-grid">
-                {filteredRooms.map((room) => (
-                  <div
-                    key={room.id}
-                    className="room-card"
+              {buildings.length === 0 ? (
+                <div className="no-buildings-message">
+                  <FaBuilding className="message-icon" />
+                  <h3>No Buildings Available</h3>
+                  <p>Please add a building first to manage rooms.</p>
+                  <button 
+                    className="btn btn-primary" 
                     onClick={() => {
-                      setSelectedRoom(room)
-                      navigate(`/devices/${room.id}`)
+                      setActiveTab("buildings");
+                      setShowAddBuildingModal(true);
                     }}
                   >
-                    <div className="room-header">
-                      <div className="room-info">
-                        <FaDoorOpen className="room-icon" />
-                        <span className="room-name">{room.name}</span>
-                      </div>
-                      <div className="room-status online">
-                        <FaWifi className="status-icon" />
-                        Active
-                      </div>
-                    </div>
-                    <div className="room-content">
-                      <div className="room-detail">
-                        <span className="detail-label">Camera:</span>
-                        <span className="detail-value">{room.live_camera || "No camera"}</span>
-                      </div>
-                      {/* Add device count detail */}
-                      <div className="room-detail">
-                        <span className="detail-label">Devices:</span>
-                        <span className="detail-value">{room.devices_count || 0}</span>
+                    Add Building
+                  </button>
+                </div>
+              ) : (
+                <>
+                  {/* Navbar with only search and sort */}
+                  <div className="rooms-header">
+                    <div style={{ marginBottom: "16px" }}>
+                      <div className="rooms-title">
+                        <FaBuilding className="rooms-icon" />
+                        Rooms in {selectedBuilding?.name || "Select a Building"}
                       </div>
                     </div>
-                    <div className="room-actions">
-                      <button
-                        className="action-btn edit"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          setRoomToEditId(room.id)
-                          setEditRoomName(room.name)
-                          setEditRoomCamera(room.live_camera || "")
-                          setShowEditRoomModal(true)
-                          setSelectedRoom(room)
-                        }}
-                        title="Edit room"
-                      >
-                        <FaPencilAlt />
-                      </button>
-                      <button
-                        className="action-btn delete"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          setSelectedRoom(room)
-                          if (window.confirm(`Delete ${room.name}?`)) {
-                            deleteRoom(room.id)
-                          }
-                        }}
-                        title="Delete room"
-                      >
-                        <FaTrash />
-                      </button>
+                    <div className="rooms-controls">
+                      <div className="search-controls">
+                        <div className="search-box">
+                          <FaSearch className="search-icon" />
+                          <input
+                            type="text"
+                            placeholder="Search rooms..."
+                            className="search-input"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                          />
+                        </div>
+                        <select className="sort-select" value={sortOption} onChange={handleSortChange}>
+                          <option value="az">A–Z</option>
+                          <option value="za">Z–A</option>
+                        </select>
+                      </div>
                     </div>
                   </div>
-                ))}
-              </div>
+
+                  <div className="rooms-grid">
+                    {filteredRooms.map((room) => (
+                      <div
+                        key={room.id}
+                        className="room-card"
+                        onClick={() => {
+                          setSelectedRoom(room)
+                          navigate(`/devices/${room.id}`)
+                        }}
+                      >
+                        <div className="room-header">
+                          <div className="room-info">
+                            <FaDoorOpen className="room-icon" />
+                            <span className="room-name">{room.name}</span>
+                          </div>
+                          <div className="room-status online">
+                            <FaWifi className="status-icon" />
+                            Active
+                          </div>
+                        </div>
+                        <div className="room-content">
+                          <div className="room-detail">
+                            <span className="detail-label">Camera:</span>
+                            <span className="detail-value">{room.live_camera || "No camera"}</span>
+                          </div>
+                          {/* Add device count detail */}
+                          <div className="room-detail">
+                            <span className="detail-label">Devices:</span>
+                            <span className="detail-value">{room.devices_count || 0}</span>
+                          </div>
+                        </div>
+                        <div className="room-actions">
+                          <button
+                            className="action-btn edit"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setRoomToEditId(room.id)
+                              setEditRoomName(room.name)
+                              setEditRoomCamera(room.live_camera || "")
+                              setShowEditRoomModal(true)
+                              setSelectedRoom(room)
+                            }}
+                            title="Edit room"
+                          >
+                            <FaPencilAlt />
+                          </button>
+                          <button
+                            className="action-btn delete"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setSelectedRoom(room)
+                              if (window.confirm(`Delete ${room.name}?`)) {
+                                deleteRoom(room.id)
+                              }
+                            }}
+                            title="Delete room"
+                          >
+                            <FaTrash />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
           )}
 

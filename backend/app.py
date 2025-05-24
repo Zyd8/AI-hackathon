@@ -144,13 +144,12 @@ def add_building():
         data = request.get_json()
 
         name = data.get('name')
-        description = data.get('description')
+        description = data.get('description', '')  # Default to empty string if not provided
 
-        if not name or not description:
-            return jsonify({'success': False, 'message': 'Name and description are required'}), 400
+        if not name:  # Only check if name is provided
+            return jsonify({'success': False, 'message': 'Building name is required'}), 400
 
         new_building = Building(name=name, description=description)
-
 
         db.session.add(new_building)
         db.session.commit()
