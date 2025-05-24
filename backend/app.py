@@ -586,9 +586,9 @@ def ai_device_scheduler():
                 room_id = str(device.room_id)
                 person_count = camera_service.get_person_count(room_id)
                 now = time.time()
-                # Enable logic
+                # Enable logic - trigger when person count is greater than or equal to threshold
                 if person_count is not None and device.persons_before_enabled is not None and device.delay_before_enabled is not None:
-                    if person_count >= device.persons_before_enabled:
+                    if person_count >= device.persons_before_enabled:  # Changed from > to >=
                         # Start/continue enable timer
                         if device.id not in last_enable_time:
                             last_enable_time[device.id] = now
@@ -598,9 +598,9 @@ def ai_device_scheduler():
                                 db.session.commit()
                     else:
                         last_enable_time[device.id] = now
-                # Disable logic
+                # Disable logic - trigger when person count is less than threshold
                 if person_count is not None and device.persons_before_disabled is not None and device.delay_before_disabled is not None:
-                    if person_count <= device.persons_before_disabled:
+                    if person_count < device.persons_before_disabled:  # Changed from <= to <
                         # Start/continue disable timer
                         if device.id not in last_disable_time:
                             last_disable_time[device.id] = now

@@ -195,7 +195,7 @@ const DevicesPage = () => {
     hardware_id: "",
     name: "",
     is_enabled: true,
-    persons_before_enabled: 0,
+    persons_before_enabled: 1,  // Changed from 0 to 1
     delay_before_enabled: 0,
     persons_before_disabled: 0,
     delay_before_disabled: 0,
@@ -597,7 +597,7 @@ const DevicesPage = () => {
               <div className="form-group">
                 <label className="form-label">Hardware ID</label>
                 <input
-                  type="number"
+                  type="text"
                   name="hardware_id"
                   className="form-input"
                   placeholder="Enter hardware ID"
